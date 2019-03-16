@@ -1,9 +1,11 @@
 package gocodeit
 
 import (
-	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/alecthomas/kingpin.v2"
+	"honnef.co/go/tools/version"
 )
 
 func App() {
