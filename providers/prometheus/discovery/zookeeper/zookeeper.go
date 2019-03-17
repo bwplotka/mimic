@@ -17,7 +17,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-
 // ServersetSDConfig is the configuration for Twitter serversets in Zookeeper based discovery.
 type ServersetSDConfig struct {
 	Servers []string       `yaml:"servers"`

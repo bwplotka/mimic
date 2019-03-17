@@ -4,6 +4,7 @@ import (
 	"github.com/bwplotka/gocodeit"
 	"github.com/bwplotka/gocodeit/encoding"
 	"github.com/bwplotka/gocodeit/providers/dockercompose"
+	"github.com/bwplotka/gocodeit/providers/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -27,13 +28,20 @@ func genMyMonAll(gci *gocodeit.Gen, secrets Secrets) {
 		for _, cl := range ClustersByEnv[env] {
 			gci := gci.With(cl.Name)
 
-			genMyMonDockerCompose(gci, secrets)
+			genMyMonDockerCompose(gci)
 		}
 	}
 
 }
 
-func genMyMonDockerCompose(gci *gocodeit.Gen, secrets Secrets) {
+func genMyMonPrometheusConfig(gci *gocodeit.Gen) {
+	cfg := prometheus.Config{
+		ScrapeConfigs: []*prometheus.ScrapeConfig{},
+	}
+	gci.Add("prometheus.yaml", encoding.YAML(cfg))
+}
+
+func genMyMonDockerCompose(gci *gocodeit.Gen) {
 	const (
 		prometheusDataVolume       = "prometheus-data"
 		prometheusDockerVolumePath = "/docker-volumes/prometheus-data"
