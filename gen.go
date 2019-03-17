@@ -72,7 +72,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Gen {
 		return a
 	}
 
-	level.Error(logger).Log("err", "command not found", "command", cmd)
+	_  = level.Error(logger).Log("err", "command not found", "command", cmd)
 	os.Exit(2)
 
 	return nil
@@ -90,5 +90,6 @@ func (g *Gen) With(parts ...string) *Gen {
 }
 
 func (g *Gen) Generate() {
+	_ = level.Info(g.Logger).Log("msg", "generated output", "dir", g.out)
 	g.write(g.out)
 }

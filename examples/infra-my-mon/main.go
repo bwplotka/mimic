@@ -138,7 +138,6 @@ func genMyMonDockerCompose(gci *gocodeit.Gen, secrets Secrets) {
 						ReadOnly: true,
 					},
 				},
-				Expose: dockercompose.StringOrNumberList{"9100"},
 				Networks: map[string]*dockercompose.ServiceNetworkConfig{
 					monitoringNet: {},
 				},

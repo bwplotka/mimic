@@ -6,10 +6,12 @@ import (
 	"time"
 )
 
-// Copy of https://github.com/docker/cli/tree/master/cli/compose/types with improvements.
-// Hardcoded version: 3.7
-// Useful constants in some places (not complete!)
-// Added some comments from https://docs.docker.com/compose/compose-file/ (not complete!)
+// Copy of https://github.com/docker/cli/tree/master/cli/compose/types with improvements:
+// * Hardcoded version: 3.7
+// * Useful constants in some places (not complete!)
+// * Added some comments from https://docs.docker.com/compose/compose-file/ (not complete!)
+// * Changed some fields to pointers (otherwise `omitempty` is useless)
+//
 // This is really minimal config. We are missing real benefits like all constants defined (e.g enums) etc.
 // TODO: contribute or create our type that matches the docker-compose-config.
 // We can assume some simplification like no short config option.
@@ -227,16 +229,16 @@ const (
 type ServiceConfig struct {
 	Name string `yaml:"-" json:"-"`
 
-	Build          BuildConfig              `yaml:",omitempty" json:"build,omitempty"`
+	Build          *BuildConfig              `yaml:",omitempty" json:"build,omitempty"`
 	CapAdd         []string                 `mapstructure:"cap_add" yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
 	CapDrop        []string                 `mapstructure:"cap_drop" yaml:"cap_drop,omitempty" json:"cap_drop,omitempty"`
 	CgroupParent   string                   `mapstructure:"cgroup_parent" yaml:"cgroup_parent,omitempty" json:"cgroup_parent,omitempty"`
 	Command        ShellCommand             `yaml:",omitempty" json:"command,omitempty"`
 	Configs        []ServiceConfigObjConfig `yaml:",omitempty" json:"configs,omitempty"`
 	ContainerName  string                   `mapstructure:"container_name" yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	CredentialSpec CredentialSpecConfig     `mapstructure:"credential_spec" yaml:"credential_spec,omitempty" json:"credential_spec,omitempty"`
+	CredentialSpec *CredentialSpecConfig     `mapstructure:"credential_spec" yaml:"credential_spec,omitempty" json:"credential_spec,omitempty"`
 	DependsOn      []string                 `mapstructure:"depends_on" yaml:"depends_on,omitempty" json:"depends_on,omitempty"`
-	Deploy         DeployConfig             `yaml:",omitempty" json:"deploy,omitempty"`
+	Deploy         *DeployConfig             `yaml:",omitempty" json:"deploy,omitempty"`
 	Devices        []string                 `yaml:",omitempty" json:"devices,omitempty"`
 	DNS            StringList               `yaml:",omitempty" json:"dns,omitempty"`
 	DNSSearch      StringList               `mapstructure:"dns_search" yaml:"dns_search,omitempty" json:"dns_search,omitempty"`
@@ -545,8 +547,8 @@ type NetworkConfig struct {
 	// The Docker Engine returns an error if the driver is not available.
 	Driver     string                 `yaml:",omitempty" json:"driver,omitempty"`
 	DriverOpts map[string]string      `mapstructure:"driver_opts" yaml:"driver_opts,omitempty" json:"driver_opts,omitempty"`
-	Ipam       IPAMConfig             `yaml:",omitempty" json:"ipam,omitempty"`
-	External   External               `yaml:",omitempty" json:"external,omitempty"`
+	Ipam       *IPAMConfig             `yaml:",omitempty" json:"ipam,omitempty"`
+	External   *External               `yaml:",omitempty" json:"external,omitempty"`
 	Internal   bool                   `yaml:",omitempty" json:"internal,omitempty"`
 	Attachable bool                   `yaml:",omitempty" json:"attachable,omitempty"`
 	Labels     Labels                 `yaml:",omitempty" json:"labels,omitempty"`
