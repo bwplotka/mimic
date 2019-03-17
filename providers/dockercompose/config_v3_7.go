@@ -3,7 +3,6 @@ package dockercompose
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
@@ -11,8 +10,18 @@ import (
 // * cloning and building github.com/a-h/generate
 // * ./schema-generate -p dockercompose -o providers/dockercompose/config_v3_7.go providers/dockercompose/config_schema_v3.7.json
 // * all *_object refactored to no _object suffix.
+// * Associate arrays together (e.g Secrets is now []*Secret)
+// Made version hardcoded. We expect 3 and we generate always 3.
 
 type Config struct {
+	Configs  []*ConfigFile `json:"configs,omitempty"`
+	Networks []*Network    `json:"networks,omitempty"`
+	Secrets  []*Secret     `json:"secrets,omitempty"`
+	Services []*Service    `json:"services,omitempty"`
+	Volumes  []*Volume     `json:"volumes,omitempty"`
+}
+
+type ConfigFile struct {
 	External interface{} `json:"external,omitempty"`
 	File     string      `json:"file,omitempty"`
 	Labels   interface{} `json:"labels,omitempty"`
@@ -22,10 +31,6 @@ type Config struct {
 // ConfigItems
 type ConfigItems struct {
 	Subnet string `json:"subnet,omitempty"`
-}
-
-// Configs
-type Configs struct {
 }
 
 // CredentialSpec
@@ -107,10 +112,6 @@ type Network struct {
 	Name       string      `json:"name,omitempty"`
 }
 
-// Networks
-type Networks struct {
-}
-
 // Options
 type Options struct {
 }
@@ -157,26 +158,12 @@ type RollbackConfig struct {
 	Parallelism     int     `json:"parallelism,omitempty"`
 }
 
-// Root
-type Root struct {
-	Configs  *Configs  `json:"configs,omitempty"`
-	Networks *Networks `json:"networks,omitempty"`
-	Secrets  *Secrets  `json:"secrets,omitempty"`
-	Services *Services `json:"services,omitempty"`
-	Version  string    `json:"version"`
-	Volumes  *Volumes  `json:"volumes,omitempty"`
-}
-
 // Secret
 type Secret struct {
 	External interface{} `json:"external,omitempty"`
 	File     string      `json:"file,omitempty"`
 	Labels   interface{} `json:"labels,omitempty"`
 	Name     string      `json:"name,omitempty"`
-}
-
-// Secrets
-type Secrets struct {
 }
 
 // Service
@@ -234,10 +221,6 @@ type Service struct {
 	WorkingDir      string          `json:"working_dir,omitempty"`
 }
 
-// Services
-type Services struct {
-}
-
 // Ulimits
 type Ulimits struct {
 }
@@ -263,91 +246,6 @@ type Volume struct {
 
 // Volumes
 type Volumes struct {
-}
-
-func (strct *Config) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "external" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"external\": ")
-	if tmp, err := json.Marshal(strct.External); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "file" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"file\": ")
-	if tmp, err := json.Marshal(strct.File); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "name" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"name\": ")
-	if tmp, err := json.Marshal(strct.Name); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Config) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "external":
-			if err := json.Unmarshal([]byte(v), &strct.External); err != nil {
-				return err
-			}
-		case "file":
-			if err := json.Unmarshal([]byte(v), &strct.File); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "name":
-			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
 }
 
 func (strct *ConfigItems) MarshalJSON() ([]byte, error) {
@@ -390,7 +288,7 @@ func (strct *ConfigItems) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (strct *Configs) MarshalJSON() ([]byte, error) {
+func (strct *ConfigFile) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
 
@@ -399,7 +297,7 @@ func (strct *Configs) MarshalJSON() ([]byte, error) {
 	return rv, nil
 }
 
-func (strct *Configs) UnmarshalJSON(b []byte) error {
+func (strct *ConfigFile) UnmarshalJSON(b []byte) error {
 	var jsonMap map[string]json.RawMessage
 	if err := json.Unmarshal(b, &jsonMap); err != nil {
 		return err
@@ -1514,7 +1412,7 @@ func (strct *RollbackConfig) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (strct *Root) MarshalJSON() ([]byte, error) {
+func (strct *Config) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
 	comma := false
@@ -1569,11 +1467,7 @@ func (strct *Root) MarshalJSON() ([]byte, error) {
 		buf.WriteString(",")
 	}
 	buf.WriteString("\"version\": ")
-	if tmp, err := json.Marshal(strct.Version); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
+	buf.Write([]byte(fmt.Sprintf("%d", 3)))
 	comma = true
 	// Marshal the "volumes" field
 	if comma {
@@ -1592,8 +1486,8 @@ func (strct *Root) MarshalJSON() ([]byte, error) {
 	return rv, nil
 }
 
-func (strct *Root) UnmarshalJSON(b []byte) error {
-	versionReceived := false
+func (strct *Config) UnmarshalJSON(b []byte) error {
+	var version string
 	var jsonMap map[string]json.RawMessage
 	if err := json.Unmarshal(b, &jsonMap); err != nil {
 		return err
@@ -1618,10 +1512,7 @@ func (strct *Root) UnmarshalJSON(b []byte) error {
 				return err
 			}
 		case "version":
-			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
-				return err
-			}
-			versionReceived = true
+			version = string(v)
 		case "volumes":
 			if err := json.Unmarshal([]byte(v), &strct.Volumes); err != nil {
 				return err
@@ -1631,8 +1522,8 @@ func (strct *Root) UnmarshalJSON(b []byte) error {
 		}
 	}
 	// check if version (a required property) was received
-	if !versionReceived {
-		return errors.New("\"version\" is required but was not present")
+	if version != "3" {
+		return fmt.Errorf("expected \"version\" 3 but found %v", version)
 	}
 	return nil
 }
@@ -1715,30 +1606,6 @@ func (strct *Secret) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
 				return err
 			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Secrets) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Secrets) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, _ := range jsonMap {
-		switch k {
 		default:
 			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
 		}
@@ -2529,30 +2396,6 @@ func (strct *Service) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal([]byte(v), &strct.WorkingDir); err != nil {
 				return err
 			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Services) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Services) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, _ := range jsonMap {
-		switch k {
 		default:
 			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
 		}

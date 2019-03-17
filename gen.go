@@ -2,9 +2,10 @@ package gocodeit
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"os"
 
 	"github.com/pkg/errors"
 	"gopkg.in/alecthomas/kingpin.v2"

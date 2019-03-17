@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/pmezard/go-difflib/difflib"
 )
 
@@ -17,6 +19,21 @@ type Files struct {
 	m map[string]string
 }
 
+func (f *Files) Add(fileName string, r io.Reader) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		Panicf("failed to output: %s", err)
+	}
+
+	output := filepath.Join(append(f.path, fileName)...)
+
+	// Check whether we have already written something into this file.
+	if _, ok := f.m[output]; ok {
+		Panicf("filename clash: %s", output)
+	}
+	f.m[output] = string(b)
+}
+
 func (f *Files) sortedPaths() []string {
 	var paths []string
 	for k := range f.m {
@@ -24,24 +41,6 @@ func (f *Files) sortedPaths() []string {
 	}
 	sort.Strings(paths)
 	return paths
-}
-
-func (f *Files) OutputFile(fileName string, content string) {
-	output := filepath.Join(append(f.path, fileName)...)
-
-	// Check whether we have already written something into this file.
-	if _, ok := f.m[output]; ok {
-		Panicf("filename clash: %s", output)
-	}
-	f.m[output] = content
-}
-
-func (f *Files) Output(fileName string, r io.Reader) {
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		Panicf("failed to output: %s", err)
-	}
-	f.OutputFile(fileName, string(b))
 }
 
 func (f *Files) write(outputDir string) {
@@ -90,4 +89,15 @@ func (f *Files) diff(f2 *Files) string {
 		}
 	}
 	return out
+}
+
+func UnmarshalSecretFile(file string, in interface{}) {
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		Panicf("read file from: %v", err)
+	}
+
+	if err := yaml.Unmarshal(b, in); err != nil {
+		Panicf("failed to unmarshal file from: %v", err)
+	}
 }
