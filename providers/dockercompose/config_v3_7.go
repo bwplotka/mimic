@@ -1,2643 +1,630 @@
 package dockercompose
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
-// Generated using:
-// * cloning and building github.com/a-h/generate
-// * ./schema-generate -p dockercompose -o providers/dockercompose/config_v3_7.go providers/dockercompose/config_schema_v3.7.json
-// * all *_object refactored to no _object suffix.
-// * Associate arrays together (e.g Secrets is now []*Secret)
-// Made version hardcoded. We expect 3 and we generate always 3.
+// Copy of https://github.com/docker/cli/tree/master/cli/compose/types with improvements.
+// Hardcoded version: 3.7
+// Useful constants in some places (not complete!)
+// Added some comments from https://docs.docker.com/compose/compose-file/ (not complete!)
+// This is really minimal config. We are missing real benefits like all constants defined (e.g enums) etc.
+// TODO: contribute or create our type that matches the docker-compose-config.
+// We can assume some simplification like no short config option.
 
-type Config struct {
-	Configs  []*ConfigFile `json:"configs,omitempty"`
-	Networks []*Network    `json:"networks,omitempty"`
-	Secrets  []*Secret     `json:"secrets,omitempty"`
-	Services []*Service    `json:"services,omitempty"`
-	Volumes  []*Volume     `json:"volumes,omitempty"`
+// UnsupportedProperties not yet supported by this implementation of the compose file
+var UnsupportedProperties = []string{
+	"build",
+	"cap_add",
+	"cap_drop",
+	"cgroup_parent",
+	"devices",
+	"domainname",
+	"external_links",
+	"ipc",
+	"links",
+	"mac_address",
+	"network_mode",
+	"pid",
+	"privileged",
+	"restart",
+	"security_opt",
+	"shm_size",
+	"sysctls",
+	"ulimits",
+	"userns_mode",
 }
 
+// DeprecatedProperties that were removed from the v3 format, but their
+// use should not impact the behaviour of the application.
+var DeprecatedProperties = map[string]string{
+	"container_name": "Setting the container name is not supported.",
+	"expose":         "Exposing ports is unnecessary - services on the same network can access each other's containers on any port.",
+}
+
+// ForbiddenProperties that are not supported in this implementation of the
+// compose file.
+var ForbiddenProperties = map[string]string{
+	"extends":       "Support for `extends` is not implemented yet.",
+	"volume_driver": "Instead of setting the volume driver on the service, define a volume using the top-level `volumes` option and specify the driver there.",
+	"volumes_from":  "To share a volume between services, define it using the top-level `volumes` option and reference it from each service that shares it using the service-level `volumes` option.",
+	"cpu_quota":     "Set resource limits using deploy.resources",
+	"cpu_shares":    "Set resource limits using deploy.resources",
+	"cpuset":        "Set resource limits using deploy.resources",
+	"mem_limit":     "Set resource limits using deploy.resources",
+	"memswap_limit": "Set resource limits using deploy.resources",
+}
+
+// ConfigFile is a filename and the contents of the file as a Dict
 type ConfigFile struct {
-	External interface{} `json:"external,omitempty"`
-	File     string      `json:"file,omitempty"`
-	Labels   interface{} `json:"labels,omitempty"`
-	Name     string      `json:"name,omitempty"`
+	Filename string
+	Config   map[string]interface{}
 }
 
-// ConfigItems
-type ConfigItems struct {
-	Subnet string `json:"subnet,omitempty"`
+// ConfigDetails are the details about a group of ConfigFiles
+type ConfigDetails struct {
+	Version     string
+	WorkingDir  string
+	ConfigFiles []ConfigFile
+	Environment map[string]string
 }
 
-// CredentialSpec
-type CredentialSpec struct {
-	File     string `json:"file,omitempty"`
-	Registry string `json:"registry,omitempty"`
+// Duration is a thin wrapper around time.Duration with improved JSON marshalling
+type Duration time.Duration
+
+func (d Duration) String() string {
+	return time.Duration(d).String()
 }
 
-// Deployment
-type Deployment struct {
-	EndpointMode   string          `json:"endpoint_mode,omitempty"`
-	Labels         interface{}     `json:"labels,omitempty"`
-	Mode           string          `json:"mode,omitempty"`
-	Placement      *Placement      `json:"placement,omitempty"`
-	Replicas       int             `json:"replicas,omitempty"`
-	Resources      *Resources      `json:"resources,omitempty"`
-	RestartPolicy  *RestartPolicy  `json:"restart_policy,omitempty"`
-	RollbackConfig *RollbackConfig `json:"rollback_config,omitempty"`
-	UpdateConfig   *UpdateConfig   `json:"update_config,omitempty"`
+// ConvertDurationPtr converts a typedefined Duration pointer to a time.Duration pointer with the same value.
+func ConvertDurationPtr(d *Duration) *time.Duration {
+	if d == nil {
+		return nil
+	}
+	res := time.Duration(*d)
+	return &res
 }
 
-// DiscreteResourceSpec
-type DiscreteResourceSpec struct {
-	Kind  string  `json:"kind,omitempty"`
-	Value float64 `json:"value,omitempty"`
+// MarshalJSON makes Duration implement json.Marshaler
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
 }
 
-// DriverOpts
-type DriverOpts struct {
+// MarshalYAML makes Duration implement yaml.Marshaler
+func (d Duration) MarshalYAML() (interface{}, error) {
+	return d.String(), nil
 }
 
-// External
-type External struct {
-	Name string `json:"name,omitempty"`
+// LookupEnv provides a lookup function for environment variables
+func (cd ConfigDetails) LookupEnv(key string) (string, bool) {
+	v, ok := cd.Environment[key]
+	return v, ok
 }
 
-// GenericResourcesItems
-type GenericResourcesItems struct {
-	DiscreteResourceSpec *DiscreteResourceSpec `json:"discrete_resource_spec,omitempty"`
+// Config is a full compose file configuration
+type Config struct {
+	Filename string                  `yaml:"-" json:"-"`
+	Services Services                `json:"services"`
+	Networks NetworkConfigs          `yaml:",omitempty" json:"networks,omitempty"`
+	Volumes  VolumeConfigs           `yaml:",omitempty" json:"volumes,omitempty"`
+	Secrets  map[string]SecretConfig `yaml:",omitempty" json:"secrets,omitempty"`
+	Configs  ConfigObjConfigs        `yaml:",omitempty" json:"configs,omitempty"`
+	Extras   map[string]interface{}  `yaml:",inline", json:"-"`
 }
 
-// Healthcheck
-type Healthcheck struct {
-	Disable     bool        `json:"disable,omitempty"`
-	Interval    string      `json:"interval,omitempty"`
-	Retries     float64     `json:"retries,omitempty"`
-	StartPeriod string      `json:"start_period,omitempty"`
-	Test        interface{} `json:"test,omitempty"`
-	Timeout     string      `json:"timeout,omitempty"`
+// MarshalJSON makes Config implement json.Marshaler
+func (c Config) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{
+		"version":  "3.7",
+		"services": c.Services,
+	}
+
+	if len(c.Networks) > 0 {
+		m["networks"] = c.Networks
+	}
+	if len(c.Volumes) > 0 {
+		m["volumes"] = c.Volumes
+	}
+	if len(c.Secrets) > 0 {
+		m["secrets"] = c.Secrets
+	}
+	if len(c.Configs) > 0 {
+		m["configs"] = c.Configs
+	}
+	for k, v := range c.Extras {
+		m[k] = v
+	}
+	return json.Marshal(m)
 }
 
-// Ipam
-type Ipam struct {
-	Config []*ConfigItems `json:"config,omitempty"`
-	Driver string         `json:"driver,omitempty"`
+type VolumeConfigs []VolumeConfig
+
+func (s VolumeConfigs) MarshalYAML() (interface{}, error) {
+	vs := map[string]VolumeConfig{}
+	for _, v := range s {
+		vs[v.Name] = v
+	}
+	return vs, nil
 }
 
-// Limits
-type Limits struct {
-	Cpus   string `json:"cpus,omitempty"`
-	Memory string `json:"memory,omitempty"`
+func (s VolumeConfigs) MarshalJSON() ([]byte, error) {
+	data, err := s.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "  ")
 }
 
-// Logging
-type Logging struct {
-	Driver  string   `json:"driver,omitempty"`
-	Options *Options `json:"options,omitempty"`
+type NetworkConfigs []NetworkConfig
+
+func (s NetworkConfigs) MarshalYAML() (interface{}, error) {
+	vs := map[string]NetworkConfig{}
+	for _, v := range s {
+		vs[v.Name] = v
+	}
+	return vs, nil
 }
 
-// Network
-type Network struct {
-	Attachable bool        `json:"attachable,omitempty"`
-	Driver     string      `json:"driver,omitempty"`
-	DriverOpts *DriverOpts `json:"driver_opts,omitempty"`
-	External   interface{} `json:"external,omitempty"`
-	Internal   bool        `json:"internal,omitempty"`
-	Ipam       *Ipam       `json:"ipam,omitempty"`
-	Labels     interface{} `json:"labels,omitempty"`
-	Name       string      `json:"name,omitempty"`
+func (s NetworkConfigs) MarshalJSON() ([]byte, error) {
+	data, err := s.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "  ")
 }
 
-// Options
-type Options struct {
+type ConfigObjConfigs []ConfigObjConfig
+
+func (s ConfigObjConfigs) MarshalYAML() (interface{}, error) {
+	vs := map[string]ConfigObjConfig{}
+	for _, v := range s {
+		vs[v.Name] = v
+	}
+	return vs, nil
 }
 
-// Placement
-type Placement struct {
-	Constraints []string            `json:"constraints,omitempty"`
-	Preferences []*PreferencesItems `json:"preferences,omitempty"`
+func (s ConfigObjConfigs) MarshalJSON() ([]byte, error) {
+	data, err := s.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "  ")
 }
 
-// PreferencesItems
-type PreferencesItems struct {
-	Spread string `json:"spread,omitempty"`
+// Services is a list of ServiceConfig
+type Services []ServiceConfig
+
+// MarshalYAML makes Services implement yaml.Marshaller
+func (s Services) MarshalYAML() (interface{}, error) {
+	services := map[string]ServiceConfig{}
+	for _, service := range s {
+		services[service.Name] = service
+	}
+	return services, nil
 }
 
-// Reservations
-type Reservations struct {
-	Cpus             string                   `json:"cpus,omitempty"`
-	GenericResources []*GenericResourcesItems `json:"generic_resources,omitempty"`
-	Memory           string                   `json:"memory,omitempty"`
+// MarshalJSON makes Services implement json.Marshaler
+func (s Services) MarshalJSON() ([]byte, error) {
+	data, err := s.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "  ")
 }
 
-// Resources
-type Resources struct {
-	Limits       *Limits       `json:"limits,omitempty"`
-	Reservations *Reservations `json:"reservations,omitempty"`
+type RestartServiceConfig string
+
+const (
+	No_RestartServiceConfig            RestartServiceConfig = "no"
+	Always_RestartServiceConfig        RestartServiceConfig = "always"
+	OnFailure_RestartServiceConfig     RestartServiceConfig = "on-failure"
+	UnlessStopped_RestartServiceConfig RestartServiceConfig = "unless-stopped"
+)
+
+// ServiceConfig is the configuration of one service
+type ServiceConfig struct {
+	Name string `yaml:"-" json:"-"`
+
+	Build          BuildConfig              `yaml:",omitempty" json:"build,omitempty"`
+	CapAdd         []string                 `mapstructure:"cap_add" yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
+	CapDrop        []string                 `mapstructure:"cap_drop" yaml:"cap_drop,omitempty" json:"cap_drop,omitempty"`
+	CgroupParent   string                   `mapstructure:"cgroup_parent" yaml:"cgroup_parent,omitempty" json:"cgroup_parent,omitempty"`
+	Command        ShellCommand             `yaml:",omitempty" json:"command,omitempty"`
+	Configs        []ServiceConfigObjConfig `yaml:",omitempty" json:"configs,omitempty"`
+	ContainerName  string                   `mapstructure:"container_name" yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	CredentialSpec CredentialSpecConfig     `mapstructure:"credential_spec" yaml:"credential_spec,omitempty" json:"credential_spec,omitempty"`
+	DependsOn      []string                 `mapstructure:"depends_on" yaml:"depends_on,omitempty" json:"depends_on,omitempty"`
+	Deploy         DeployConfig             `yaml:",omitempty" json:"deploy,omitempty"`
+	Devices        []string                 `yaml:",omitempty" json:"devices,omitempty"`
+	DNS            StringList               `yaml:",omitempty" json:"dns,omitempty"`
+	DNSSearch      StringList               `mapstructure:"dns_search" yaml:"dns_search,omitempty" json:"dns_search,omitempty"`
+	DomainName     string                   `mapstructure:"domainname" yaml:"domainname,omitempty" json:"domainname,omitempty"`
+	Entrypoint     ShellCommand             `yaml:",omitempty" json:"entrypoint,omitempty"`
+	Environment    MappingWithEquals        `yaml:",omitempty" json:"environment,omitempty"`
+	EnvFile        StringList               `mapstructure:"env_file" yaml:"env_file,omitempty" json:"env_file,omitempty"`
+	// Expose exposes ports without publishing them to the host machine - they’ll only be accessible to linked services.
+	// Only the internal port can be specified.
+	Expose        StringOrNumberList               `yaml:",omitempty" json:"expose,omitempty"`
+	ExternalLinks []string                         `mapstructure:"external_links" yaml:"external_links,omitempty" json:"external_links,omitempty"`
+	ExtraHosts    HostsList                        `mapstructure:"extra_hosts" yaml:"extra_hosts,omitempty" json:"extra_hosts,omitempty"`
+	Hostname      string                           `yaml:",omitempty" json:"hostname,omitempty"`
+	HealthCheck   *HealthCheckConfig               `yaml:",omitempty" json:"healthcheck,omitempty"`
+	Image         string                           `yaml:",omitempty" json:"image,omitempty"`
+	Init          *bool                            `yaml:",omitempty" json:"init,omitempty"`
+	Ipc           string                           `yaml:",omitempty" json:"ipc,omitempty"`
+	Isolation     string                           `mapstructure:"isolation" yaml:"isolation,omitempty" json:"isolation,omitempty"`
+	Labels        Labels                           `yaml:",omitempty" json:"labels,omitempty"`
+	Links         []string                         `yaml:",omitempty" json:"links,omitempty"`
+	Logging       *LoggingConfig                   `yaml:",omitempty" json:"logging,omitempty"`
+	MacAddress    string                           `mapstructure:"mac_address" yaml:"mac_address,omitempty" json:"mac_address,omitempty"`
+	NetworkMode   string                           `mapstructure:"network_mode" yaml:"network_mode,omitempty" json:"network_mode,omitempty"`
+	Networks      map[string]*ServiceNetworkConfig `yaml:",omitempty" json:"networks,omitempty"`
+	Pid           string                           `yaml:",omitempty" json:"pid,omitempty"`
+	Ports         []ServicePortConfig              `yaml:",omitempty" json:"ports,omitempty"`
+	Privileged    bool                             `yaml:",omitempty" json:"privileged,omitempty"`
+	ReadOnly      bool                             `mapstructure:"read_only" yaml:"read_only,omitempty" json:"read_only,omitempty"`
+
+	// Restart.
+	// Note: This option is ignored when deploying a stack in swarm mode with a (version 3) Compose file.
+	// Use restart_policy instead.
+	// Default" `no`
+	Restart         RestartServiceConfig      `yaml:",omitempty" json:"restart,omitempty"`
+	Secrets         []ServiceSecretConfig     `yaml:",omitempty" json:"secrets,omitempty"`
+	SecurityOpt     []string                  `mapstructure:"security_opt" yaml:"security_opt,omitempty" json:"security_opt,omitempty"`
+	ShmSize         string                    `mapstructure:"shm_size" yaml:"shm_size,omitempty" json:"shm_size,omitempty"`
+	StdinOpen       bool                      `mapstructure:"stdin_open" yaml:"stdin_open,omitempty" json:"stdin_open,omitempty"`
+	StopGracePeriod *Duration                 `mapstructure:"stop_grace_period" yaml:"stop_grace_period,omitempty" json:"stop_grace_period,omitempty"`
+	StopSignal      string                    `mapstructure:"stop_signal" yaml:"stop_signal,omitempty" json:"stop_signal,omitempty"`
+	Sysctls         StringList                `yaml:",omitempty" json:"sysctls,omitempty"`
+	Tmpfs           StringList                `yaml:",omitempty" json:"tmpfs,omitempty"`
+	Tty             bool                      `mapstructure:"tty" yaml:"tty,omitempty" json:"tty,omitempty"`
+	Ulimits         map[string]*UlimitsConfig `yaml:",omitempty" json:"ulimits,omitempty"`
+	User            string                    `yaml:",omitempty" json:"user,omitempty"`
+	UserNSMode      string                    `mapstructure:"userns_mode" yaml:"userns_mode,omitempty" json:"userns_mode,omitempty"`
+	Volumes         []ServiceVolumeConfig     `yaml:",omitempty" json:"volumes,omitempty"`
+	WorkingDir      string                    `mapstructure:"working_dir" yaml:"working_dir,omitempty" json:"working_dir,omitempty"`
+
+	Extras map[string]interface{} `yaml:",inline" json:"-"`
 }
 
-// RestartPolicy
-type RestartPolicy struct {
-	Condition   string `json:"condition,omitempty"`
-	Delay       string `json:"delay,omitempty"`
-	MaxAttempts int    `json:"max_attempts,omitempty"`
-	Window      string `json:"window,omitempty"`
+// BuildConfig is a type for build
+// using the same format at libcompose: https://github.com/docker/libcompose/blob/master/yaml/build.go#L12
+type BuildConfig struct {
+	Context    string            `yaml:",omitempty" json:"context,omitempty"`
+	Dockerfile string            `yaml:",omitempty" json:"dockerfile,omitempty"`
+	Args       MappingWithEquals `yaml:",omitempty" json:"args,omitempty"`
+	Labels     Labels            `yaml:",omitempty" json:"labels,omitempty"`
+	CacheFrom  StringList        `mapstructure:"cache_from" yaml:"cache_from,omitempty" json:"cache_from,omitempty"`
+	Network    string            `yaml:",omitempty" json:"network,omitempty"`
+	Target     string            `yaml:",omitempty" json:"target,omitempty"`
 }
 
-// RollbackConfig
-type RollbackConfig struct {
-	Delay           string  `json:"delay,omitempty"`
-	FailureAction   string  `json:"failure_action,omitempty"`
-	MaxFailureRatio float64 `json:"max_failure_ratio,omitempty"`
-	Monitor         string  `json:"monitor,omitempty"`
-	Order           string  `json:"order,omitempty"`
-	Parallelism     int     `json:"parallelism,omitempty"`
+// ShellCommand is a string or list of string args
+type ShellCommand []string
+
+// StringList is a type for fields that can be a string or list of strings
+type StringList []string
+
+// StringOrNumberList is a type for fields that can be a list of strings or
+// numbers
+type StringOrNumberList []string
+
+// MappingWithEquals is a mapping type that can be converted from a list of
+// key[=value] strings.
+// For the key with an empty value (`key=`), the mapped value is set to a pointer to `""`.
+// For the key without value (`key`), the mapped value is set to nil.
+type MappingWithEquals map[string]*string
+
+// Labels is a mapping type for labels
+type Labels map[string]string
+
+// MappingWithColon is a mapping type that can be converted from a list of
+// 'key: value' strings
+type MappingWithColon map[string]string
+
+// HostsList is a list of colon-separated host-ip mappings
+type HostsList []string
+
+// LoggingConfig the logging configuration for a service
+type LoggingConfig struct {
+	Driver  string            `yaml:",omitempty" json:"driver,omitempty"`
+	Options map[string]string `yaml:",omitempty" json:"options,omitempty"`
 }
 
-// Secret
-type Secret struct {
-	External interface{} `json:"external,omitempty"`
-	File     string      `json:"file,omitempty"`
-	Labels   interface{} `json:"labels,omitempty"`
-	Name     string      `json:"name,omitempty"`
+// DeployConfig the deployment configuration for a service
+type DeployConfig struct {
+	Mode           string         `yaml:",omitempty" json:"mode,omitempty"`
+	Replicas       *uint64        `yaml:",omitempty" json:"replicas,omitempty"`
+	Labels         Labels         `yaml:",omitempty" json:"labels,omitempty"`
+	UpdateConfig   *UpdateConfig  `mapstructure:"update_config" yaml:"update_config,omitempty" json:"update_config,omitempty"`
+	RollbackConfig *UpdateConfig  `mapstructure:"rollback_config" yaml:"rollback_config,omitempty" json:"rollback_config,omitempty"`
+	Resources      Resources      `yaml:",omitempty" json:"resources,omitempty"`
+	RestartPolicy  *RestartPolicy `mapstructure:"restart_policy" yaml:"restart_policy,omitempty" json:"restart_policy,omitempty"`
+	Placement      Placement      `yaml:",omitempty" json:"placement,omitempty"`
+	EndpointMode   string         `mapstructure:"endpoint_mode" yaml:"endpoint_mode,omitempty" json:"endpoint_mode,omitempty"`
 }
 
-// Service
-type Service struct {
-	Build           interface{}     `json:"build,omitempty"`
-	CapAdd          []string        `json:"cap_add,omitempty"`
-	CapDrop         []string        `json:"cap_drop,omitempty"`
-	CgroupParent    string          `json:"cgroup_parent,omitempty"`
-	Command         interface{}     `json:"command,omitempty"`
-	Configs         []interface{}   `json:"configs,omitempty"`
-	ContainerName   string          `json:"container_name,omitempty"`
-	CredentialSpec  *CredentialSpec `json:"credential_spec,omitempty"`
-	DependsOn       []string        `json:"depends_on,omitempty"`
-	Deploy          interface{}     `json:"deploy,omitempty"`
-	Devices         []string        `json:"devices,omitempty"`
-	Dns             interface{}     `json:"dns,omitempty"`
-	DnsSearch       interface{}     `json:"dns_search,omitempty"`
-	Domainname      string          `json:"domainname,omitempty"`
-	Entrypoint      interface{}     `json:"entrypoint,omitempty"`
-	EnvFile         interface{}     `json:"env_file,omitempty"`
-	Environment     interface{}     `json:"environment,omitempty"`
-	Expose          []interface{}   `json:"expose,omitempty"`
-	ExternalLinks   []string        `json:"external_links,omitempty"`
-	ExtraHosts      interface{}     `json:"extra_hosts,omitempty"`
-	Healthcheck     *Healthcheck    `json:"healthcheck,omitempty"`
-	Hostname        string          `json:"hostname,omitempty"`
-	Image           string          `json:"image,omitempty"`
-	Init            bool            `json:"init,omitempty"`
-	Ipc             string          `json:"ipc,omitempty"`
-	Isolation       string          `json:"isolation,omitempty"`
-	Labels          interface{}     `json:"labels,omitempty"`
-	Links           []string        `json:"links,omitempty"`
-	Logging         *Logging        `json:"logging,omitempty"`
-	MacAddress      string          `json:"mac_address,omitempty"`
-	NetworkMode     string          `json:"network_mode,omitempty"`
-	Networks        interface{}     `json:"networks,omitempty"`
-	Pid             interface{}     `json:"pid,omitempty"`
-	Ports           []interface{}   `json:"ports,omitempty"`
-	Privileged      bool            `json:"privileged,omitempty"`
-	ReadOnly        bool            `json:"read_only,omitempty"`
-	Restart         string          `json:"restart,omitempty"`
-	Secrets         []interface{}   `json:"secrets,omitempty"`
-	SecurityOpt     []string        `json:"security_opt,omitempty"`
-	ShmSize         interface{}     `json:"shm_size,omitempty"`
-	StdinOpen       bool            `json:"stdin_open,omitempty"`
-	StopGracePeriod string          `json:"stop_grace_period,omitempty"`
-	StopSignal      string          `json:"stop_signal,omitempty"`
-	Sysctls         interface{}     `json:"sysctls,omitempty"`
-	Tmpfs           interface{}     `json:"tmpfs,omitempty"`
-	Tty             bool            `json:"tty,omitempty"`
-	Ulimits         *Ulimits        `json:"ulimits,omitempty"`
-	User            string          `json:"user,omitempty"`
-	UsernsMode      string          `json:"userns_mode,omitempty"`
-	Volumes         []interface{}   `json:"volumes,omitempty"`
-	WorkingDir      string          `json:"working_dir,omitempty"`
+// HealthCheckConfig the healthcheck configuration for a service
+type HealthCheckConfig struct {
+	Test        HealthCheckTest `yaml:",omitempty" json:"test,omitempty"`
+	Timeout     *Duration       `yaml:",omitempty" json:"timeout,omitempty"`
+	Interval    *Duration       `yaml:",omitempty" json:"interval,omitempty"`
+	Retries     *uint64         `yaml:",omitempty" json:"retries,omitempty"`
+	StartPeriod *Duration       `mapstructure:"start_period" yaml:"start_period,omitempty" json:"start_period,omitempty"`
+	Disable     bool            `yaml:",omitempty" json:"disable,omitempty"`
 }
 
-// Ulimits
-type Ulimits struct {
-}
+// HealthCheckTest is the command run to test the health of a service
+type HealthCheckTest []string
 
-// UpdateConfig
+// UpdateConfig the service update configuration
 type UpdateConfig struct {
-	Delay           string  `json:"delay,omitempty"`
-	FailureAction   string  `json:"failure_action,omitempty"`
-	MaxFailureRatio float64 `json:"max_failure_ratio,omitempty"`
-	Monitor         string  `json:"monitor,omitempty"`
-	Order           string  `json:"order,omitempty"`
-	Parallelism     int     `json:"parallelism,omitempty"`
+	Parallelism     *uint64  `yaml:",omitempty" json:"parallelism,omitempty"`
+	Delay           Duration `yaml:",omitempty" json:"delay,omitempty"`
+	FailureAction   string   `mapstructure:"failure_action" yaml:"failure_action,omitempty" json:"failure_action,omitempty"`
+	Monitor         Duration `yaml:",omitempty" json:"monitor,omitempty"`
+	MaxFailureRatio float32  `mapstructure:"max_failure_ratio" yaml:"max_failure_ratio,omitempty" json:"max_failure_ratio,omitempty"`
+	Order           string   `yaml:",omitempty" json:"order,omitempty"`
 }
 
-// Volume
-type Volume struct {
-	Driver     string      `json:"driver,omitempty"`
-	DriverOpts *DriverOpts `json:"driver_opts,omitempty"`
-	External   interface{} `json:"external,omitempty"`
-	Labels     interface{} `json:"labels,omitempty"`
-	Name       string      `json:"name,omitempty"`
+// Resources the resource limits and reservations
+type Resources struct {
+	Limits       *Resource `yaml:",omitempty" json:"limits,omitempty"`
+	Reservations *Resource `yaml:",omitempty" json:"reservations,omitempty"`
 }
 
-// Volumes
-type Volumes struct {
+// Resource is a resource to be limited or reserved
+type Resource struct {
+	// TODO: types to convert from units and ratios
+	NanoCPUs         string            `mapstructure:"cpus" yaml:"cpus,omitempty" json:"cpus,omitempty"`
+	MemoryBytes      UnitBytes         `mapstructure:"memory" yaml:"memory,omitempty" json:"memory,omitempty"`
+	GenericResources []GenericResource `mapstructure:"generic_resources" yaml:"generic_resources,omitempty" json:"generic_resources,omitempty"`
 }
 
-func (strct *ConfigItems) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "subnet" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"subnet\": ")
-	if tmp, err := json.Marshal(strct.Subnet); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// GenericResource represents a "user defined" resource which can
+// only be an integer (e.g: SSD=3) for a service
+type GenericResource struct {
+	DiscreteResourceSpec *DiscreteGenericResource `mapstructure:"discrete_resource_spec" yaml:"discrete_resource_spec,omitempty" json:"discrete_resource_spec,omitempty"`
 }
 
-func (strct *ConfigItems) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "subnet":
-			if err := json.Unmarshal([]byte(v), &strct.Subnet); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// DiscreteGenericResource represents a "user defined" resource which is defined
+// as an integer
+// "Kind" is used to describe the Kind of a resource (e.g: "GPU", "FPGA", "SSD", ...)
+// Value is used to count the resource (SSD=5, HDD=3, ...)
+type DiscreteGenericResource struct {
+	Kind  string `json:"kind"`
+	Value int64  `json:"value"`
 }
 
-func (strct *ConfigFile) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
+// UnitBytes is the bytes type
+type UnitBytes int64
 
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// MarshalYAML makes UnitBytes implement yaml.Marshaller
+func (u UnitBytes) MarshalYAML() (interface{}, error) {
+	return fmt.Sprintf("%d", u), nil
 }
 
-func (strct *ConfigFile) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, _ := range jsonMap {
-		switch k {
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// MarshalJSON makes UnitBytes implement json.Marshaler
+func (u UnitBytes) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%d"`, u)), nil
 }
 
-func (strct *Deployment) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "endpoint_mode" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"endpoint_mode\": ")
-	if tmp, err := json.Marshal(strct.EndpointMode); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "mode" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"mode\": ")
-	if tmp, err := json.Marshal(strct.Mode); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "placement" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"placement\": ")
-	if tmp, err := json.Marshal(strct.Placement); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "replicas" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"replicas\": ")
-	if tmp, err := json.Marshal(strct.Replicas); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "resources" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"resources\": ")
-	if tmp, err := json.Marshal(strct.Resources); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "restart_policy" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"restart_policy\": ")
-	if tmp, err := json.Marshal(strct.RestartPolicy); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "rollback_config" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"rollback_config\": ")
-	if tmp, err := json.Marshal(strct.RollbackConfig); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "update_config" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"update_config\": ")
-	if tmp, err := json.Marshal(strct.UpdateConfig); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// RestartPolicy the service restart policy
+type RestartPolicy struct {
+	Condition   string    `yaml:",omitempty" json:"condition,omitempty"`
+	Delay       *Duration `yaml:",omitempty" json:"delay,omitempty"`
+	MaxAttempts *uint64   `mapstructure:"max_attempts" yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
+	Window      *Duration `yaml:",omitempty" json:"window,omitempty"`
 }
 
-func (strct *Deployment) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "endpoint_mode":
-			if err := json.Unmarshal([]byte(v), &strct.EndpointMode); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "mode":
-			if err := json.Unmarshal([]byte(v), &strct.Mode); err != nil {
-				return err
-			}
-		case "placement":
-			if err := json.Unmarshal([]byte(v), &strct.Placement); err != nil {
-				return err
-			}
-		case "replicas":
-			if err := json.Unmarshal([]byte(v), &strct.Replicas); err != nil {
-				return err
-			}
-		case "resources":
-			if err := json.Unmarshal([]byte(v), &strct.Resources); err != nil {
-				return err
-			}
-		case "restart_policy":
-			if err := json.Unmarshal([]byte(v), &strct.RestartPolicy); err != nil {
-				return err
-			}
-		case "rollback_config":
-			if err := json.Unmarshal([]byte(v), &strct.RollbackConfig); err != nil {
-				return err
-			}
-		case "update_config":
-			if err := json.Unmarshal([]byte(v), &strct.UpdateConfig); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// Placement constraints for the service
+type Placement struct {
+	Constraints []string               `yaml:",omitempty" json:"constraints,omitempty"`
+	Preferences []PlacementPreferences `yaml:",omitempty" json:"preferences,omitempty"`
+	MaxReplicas uint64                 `mapstructure:"max_replicas_per_node" yaml:"max_replicas_per_node,omitempty" json:"max_replicas_per_node,omitempty"`
 }
 
-func (strct *DiscreteResourceSpec) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "kind" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"kind\": ")
-	if tmp, err := json.Marshal(strct.Kind); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "value" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"value\": ")
-	if tmp, err := json.Marshal(strct.Value); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// PlacementPreferences is the preferences for a service placement
+type PlacementPreferences struct {
+	Spread string `yaml:",omitempty" json:"spread,omitempty"`
 }
 
-func (strct *DiscreteResourceSpec) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "kind":
-			if err := json.Unmarshal([]byte(v), &strct.Kind); err != nil {
-				return err
-			}
-		case "value":
-			if err := json.Unmarshal([]byte(v), &strct.Value); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// ServiceNetworkConfig is the network configuration for a service
+type ServiceNetworkConfig struct {
+	Aliases     []string `yaml:",omitempty" json:"aliases,omitempty"`
+	Ipv4Address string   `mapstructure:"ipv4_address" yaml:"ipv4_address,omitempty" json:"ipv4_address,omitempty"`
+	Ipv6Address string   `mapstructure:"ipv6_address" yaml:"ipv6_address,omitempty" json:"ipv6_address,omitempty"`
 }
 
-func (strct *GenericResourcesItems) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "discrete_resource_spec" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"discrete_resource_spec\": ")
-	if tmp, err := json.Marshal(strct.DiscreteResourceSpec); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// ServicePortConfig is the port configuration for a service
+type ServicePortConfig struct {
+	Mode      string `yaml:",omitempty" json:"mode,omitempty"`
+	Target    uint32 `yaml:",omitempty" json:"target,omitempty"`
+	Published uint32 `yaml:",omitempty" json:"published,omitempty"`
+	Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
 }
 
-func (strct *GenericResourcesItems) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "discrete_resource_spec":
-			if err := json.Unmarshal([]byte(v), &strct.DiscreteResourceSpec); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+type ServiceVolumeType string
+
+const (
+	Volume_ServiceVolumeType ServiceVolumeType = "volume"
+	Bind_ServiceVolumeType   ServiceVolumeType = "bind"
+	Tmpf_ServiceVolumeType   ServiceVolumeType = "tmpfs"
+)
+
+type ServiceVolumeConsistency string
+
+const (
+	// Consistent: host and container have identical view.
+	Consistent_ServiceVolumeConsistency ServiceVolumeConsistency = "consistent"
+	// Cached: read cache, host view is authoritative.
+	Cached_ServiceVolumeConsistency ServiceVolumeConsistency = "cached"
+	// Delegated: read-write cache, container’s view is authoritative.
+	Delegated_ServiceVolumeConsistency ServiceVolumeConsistency = "delegated"
+)
+
+// ServiceVolumeConfig are references to a volume used by a service
+type ServiceVolumeConfig struct {
+	Type ServiceVolumeType `yaml:",omitempty" json:"type,omitempty"`
+	// Source is the source of the mount, a path on the host for a bind mount,
+	// or the name of a volume defined in the top-level volumes key. Not applicable for a tmpfs mount.
+	Source string `yaml:",omitempty" json:"source,omitempty"`
+	// Target the path in the container where the volume is mounted.
+	Target string `yaml:",omitempty" json:"target,omitempty"`
+	// ReadOnly is flag to set the volume as read-only.
+	ReadOnly bool `mapstructure:"read_only" yaml:"read_only,omitempty" json:"read_only,omitempty"`
+	// Consistency is the consistency requirements of the mount.
+	Consistency ServiceVolumeConsistency `yaml:",omitempty" json:"consistency,omitempty"`
+
+	Bind   *ServiceVolumeBind   `yaml:",omitempty" json:"bind,omitempty"`
+	Volume *ServiceVolumeVolume `yaml:",omitempty" json:"volume,omitempty"`
+	Tmpfs  *ServiceVolumeTmpfs  `yaml:",omitempty" json:"tmpfs,omitempty"`
 }
 
-func (strct *Healthcheck) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "disable" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"disable\": ")
-	if tmp, err := json.Marshal(strct.Disable); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "interval" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"interval\": ")
-	if tmp, err := json.Marshal(strct.Interval); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "retries" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"retries\": ")
-	if tmp, err := json.Marshal(strct.Retries); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "start_period" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"start_period\": ")
-	if tmp, err := json.Marshal(strct.StartPeriod); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "test" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"test\": ")
-	if tmp, err := json.Marshal(strct.Test); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "timeout" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"timeout\": ")
-	if tmp, err := json.Marshal(strct.Timeout); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// ServiceVolumeBind are options for a service volume of type bind
+type ServiceVolumeBind struct {
+	Propagation string `yaml:",omitempty" json:"propagation,omitempty"`
 }
 
-func (strct *Healthcheck) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "disable":
-			if err := json.Unmarshal([]byte(v), &strct.Disable); err != nil {
-				return err
-			}
-		case "interval":
-			if err := json.Unmarshal([]byte(v), &strct.Interval); err != nil {
-				return err
-			}
-		case "retries":
-			if err := json.Unmarshal([]byte(v), &strct.Retries); err != nil {
-				return err
-			}
-		case "start_period":
-			if err := json.Unmarshal([]byte(v), &strct.StartPeriod); err != nil {
-				return err
-			}
-		case "test":
-			if err := json.Unmarshal([]byte(v), &strct.Test); err != nil {
-				return err
-			}
-		case "timeout":
-			if err := json.Unmarshal([]byte(v), &strct.Timeout); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// ServiceVolumeVolume are options for a service volume of type volume
+type ServiceVolumeVolume struct {
+	NoCopy bool `mapstructure:"nocopy" yaml:"nocopy,omitempty" json:"nocopy,omitempty"`
 }
 
-func (strct *Ipam) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "config" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"config\": ")
-	if tmp, err := json.Marshal(strct.Config); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "driver" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"driver\": ")
-	if tmp, err := json.Marshal(strct.Driver); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// ServiceVolumeTmpfs are options for a service volume of type tmpfs
+type ServiceVolumeTmpfs struct {
+	Size int64 `yaml:",omitempty" json:"size,omitempty"`
 }
 
-func (strct *Ipam) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "config":
-			if err := json.Unmarshal([]byte(v), &strct.Config); err != nil {
-				return err
-			}
-		case "driver":
-			if err := json.Unmarshal([]byte(v), &strct.Driver); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// FileReferenceConfig for a reference to a swarm file object
+type FileReferenceConfig struct {
+	Source string  `yaml:",omitempty" json:"source,omitempty"`
+	Target string  `yaml:",omitempty" json:"target,omitempty"`
+	UID    string  `yaml:",omitempty" json:"uid,omitempty"`
+	GID    string  `yaml:",omitempty" json:"gid,omitempty"`
+	Mode   *uint32 `yaml:",omitempty" json:"mode,omitempty"`
 }
 
-func (strct *Limits) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "cpus" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"cpus\": ")
-	if tmp, err := json.Marshal(strct.Cpus); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "memory" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"memory\": ")
-	if tmp, err := json.Marshal(strct.Memory); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
+// ServiceConfigObjConfig is the config obj configuration for a service
+type ServiceConfigObjConfig FileReferenceConfig
 
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// ServiceSecretConfig is the secret configuration for a service
+type ServiceSecretConfig FileReferenceConfig
+
+// UlimitsConfig the ulimit configuration
+type UlimitsConfig struct {
+	Single int `yaml:",omitempty" json:"single,omitempty"`
+	Soft   int `yaml:",omitempty" json:"soft,omitempty"`
+	Hard   int `yaml:",omitempty" json:"hard,omitempty"`
 }
 
-func (strct *Limits) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
+// MarshalYAML makes UlimitsConfig implement yaml.Marshaller
+func (u *UlimitsConfig) MarshalYAML() (interface{}, error) {
+	if u.Single != 0 {
+		return u.Single, nil
 	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "cpus":
-			if err := json.Unmarshal([]byte(v), &strct.Cpus); err != nil {
-				return err
-			}
-		case "memory":
-			if err := json.Unmarshal([]byte(v), &strct.Memory); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+	return u, nil
 }
 
-func (strct *Logging) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "driver" field
-	if comma {
-		buf.WriteString(",")
+// MarshalJSON makes UlimitsConfig implement json.Marshaller
+func (u *UlimitsConfig) MarshalJSON() ([]byte, error) {
+	if u.Single != 0 {
+		return json.Marshal(u.Single)
 	}
-	buf.WriteString("\"driver\": ")
-	if tmp, err := json.Marshal(strct.Driver); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "options" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"options\": ")
-	if tmp, err := json.Marshal(strct.Options); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+	// Pass as a value to avoid re-entering this method and use the default implementation
+	return json.Marshal(*u)
 }
 
-func (strct *Logging) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "driver":
-			if err := json.Unmarshal([]byte(v), &strct.Driver); err != nil {
-				return err
-			}
-		case "options":
-			if err := json.Unmarshal([]byte(v), &strct.Options); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// NetworkConfig for a network
+type NetworkConfig struct {
+	Name string `yaml:",omitempty" json:"name,omitempty"`
+	// Driver specifies which driver should be used for this network.
+	// The default driver depends on how the Docker Engine you’re using is configured, but in most instances it is bridge on a single host and overlay on a Swarm.
+	// The Docker Engine returns an error if the driver is not available.
+	Driver     string                 `yaml:",omitempty" json:"driver,omitempty"`
+	DriverOpts map[string]string      `mapstructure:"driver_opts" yaml:"driver_opts,omitempty" json:"driver_opts,omitempty"`
+	Ipam       IPAMConfig             `yaml:",omitempty" json:"ipam,omitempty"`
+	External   External               `yaml:",omitempty" json:"external,omitempty"`
+	Internal   bool                   `yaml:",omitempty" json:"internal,omitempty"`
+	Attachable bool                   `yaml:",omitempty" json:"attachable,omitempty"`
+	Labels     Labels                 `yaml:",omitempty" json:"labels,omitempty"`
+	Extras     map[string]interface{} `yaml:",inline" json:"-"`
 }
 
-func (strct *Network) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "attachable" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"attachable\": ")
-	if tmp, err := json.Marshal(strct.Attachable); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "driver" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"driver\": ")
-	if tmp, err := json.Marshal(strct.Driver); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "driver_opts" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"driver_opts\": ")
-	if tmp, err := json.Marshal(strct.DriverOpts); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "external" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"external\": ")
-	if tmp, err := json.Marshal(strct.External); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "internal" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"internal\": ")
-	if tmp, err := json.Marshal(strct.Internal); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "ipam" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"ipam\": ")
-	if tmp, err := json.Marshal(strct.Ipam); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "name" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"name\": ")
-	if tmp, err := json.Marshal(strct.Name); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// IPAMConfig for a network
+type IPAMConfig struct {
+	Driver string      `yaml:",omitempty" json:"driver,omitempty"`
+	Config []*IPAMPool `yaml:",omitempty" json:"config,omitempty"`
 }
 
-func (strct *Network) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "attachable":
-			if err := json.Unmarshal([]byte(v), &strct.Attachable); err != nil {
-				return err
-			}
-		case "driver":
-			if err := json.Unmarshal([]byte(v), &strct.Driver); err != nil {
-				return err
-			}
-		case "driver_opts":
-			if err := json.Unmarshal([]byte(v), &strct.DriverOpts); err != nil {
-				return err
-			}
-		case "external":
-			if err := json.Unmarshal([]byte(v), &strct.External); err != nil {
-				return err
-			}
-		case "internal":
-			if err := json.Unmarshal([]byte(v), &strct.Internal); err != nil {
-				return err
-			}
-		case "ipam":
-			if err := json.Unmarshal([]byte(v), &strct.Ipam); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "name":
-			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// IPAMPool for a network
+type IPAMPool struct {
+	Subnet string `yaml:",omitempty" json:"subnet,omitempty"`
 }
 
-func (strct *Placement) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "constraints" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"constraints\": ")
-	if tmp, err := json.Marshal(strct.Constraints); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "preferences" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"preferences\": ")
-	if tmp, err := json.Marshal(strct.Preferences); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
+// VolumeConfig for a volume
+type VolumeConfig struct {
+	// Name sets a custom name for this volume. The name field can be used to reference volumes that contain special
+	// characters. The name is used as is and will not be scoped with the stack name.
+	Name string `yaml:",omitempty" json:"name,omitempty"`
 
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+	Driver     string            `yaml:",omitempty" json:"driver,omitempty"`
+	DriverOpts map[string]string `mapstructure:"driver_opts" yaml:"driver_opts,omitempty" json:"driver_opts,omitempty"`
+	// External is a flag that if set to true, specifies that this volume has been created outside of Compose.
+	// docker-compose up does not attempt to create it, and raises an error if it doesn’t exist.
+	//
+	//For version 3.3 and below of the format, external cannot be used in conjunction with other volume configuration
+	// keys (driver, driver_opts, labels). This limitation no longer exists for version 3.4 and above.
+	External External               `yaml:",omitempty" json:"external,omitempty"`
+	Labels   Labels                 `yaml:",omitempty" json:"labels,omitempty"`
+	Extras   map[string]interface{} `yaml:",inline" json:"-"`
 }
 
-func (strct *Placement) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "constraints":
-			if err := json.Unmarshal([]byte(v), &strct.Constraints); err != nil {
-				return err
-			}
-		case "preferences":
-			if err := json.Unmarshal([]byte(v), &strct.Preferences); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// External identifies a Volume or Network as a reference to a resource that is
+// not managed, and should already exist.
+// External.name is deprecated and replaced by Volume.name
+type External struct {
+	Name     string `yaml:",omitempty" json:"name,omitempty"`
+	External bool   `yaml:",omitempty" json:"external,omitempty"`
 }
 
-func (strct *PreferencesItems) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "spread" field
-	if comma {
-		buf.WriteString(",")
+// MarshalYAML makes External implement yaml.Marshaller
+func (e External) MarshalYAML() (interface{}, error) {
+	if e.Name == "" {
+		return e.External, nil
 	}
-	buf.WriteString("\"spread\": ")
-	if tmp, err := json.Marshal(strct.Spread); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+	return External{Name: e.Name}, nil
 }
 
-func (strct *PreferencesItems) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
+// MarshalJSON makes External implement json.Marshaller
+func (e External) MarshalJSON() ([]byte, error) {
+	if e.Name == "" {
+		return []byte(fmt.Sprintf("%v", e.External)), nil
 	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "spread":
-			if err := json.Unmarshal([]byte(v), &strct.Spread); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+	return []byte(fmt.Sprintf(`{"name": %q}`, e.Name)), nil
 }
 
-func (strct *Reservations) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "cpus" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"cpus\": ")
-	if tmp, err := json.Marshal(strct.Cpus); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "generic_resources" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"generic_resources\": ")
-	if tmp, err := json.Marshal(strct.GenericResources); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "memory" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"memory\": ")
-	if tmp, err := json.Marshal(strct.Memory); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+// CredentialSpecConfig for credential spec on Windows
+type CredentialSpecConfig struct {
+	// @TODO Config is not yet in use
+	Config   string `yaml:"-" json:"-"` // Config was added in API v1.40
+	File     string `yaml:",omitempty" json:"file,omitempty"`
+	Registry string `yaml:",omitempty" json:"registry,omitempty"`
 }
 
-func (strct *Reservations) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "cpus":
-			if err := json.Unmarshal([]byte(v), &strct.Cpus); err != nil {
-				return err
-			}
-		case "generic_resources":
-			if err := json.Unmarshal([]byte(v), &strct.GenericResources); err != nil {
-				return err
-			}
-		case "memory":
-			if err := json.Unmarshal([]byte(v), &strct.Memory); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
+// FileObjectConfig is a config type for a file used by a service
+type FileObjectConfig struct {
+	Name     string                 `yaml:",omitempty" json:"name,omitempty"`
+	File     string                 `yaml:",omitempty" json:"file,omitempty"`
+	External External               `yaml:",omitempty" json:"external,omitempty"`
+	Labels   Labels                 `yaml:",omitempty" json:"labels,omitempty"`
+	Extras   map[string]interface{} `yaml:",inline" json:"-"`
 }
 
-func (strct *Resources) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "limits" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"limits\": ")
-	if tmp, err := json.Marshal(strct.Limits); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "reservations" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"reservations\": ")
-	if tmp, err := json.Marshal(strct.Reservations); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
+// SecretConfig for a secret
+type SecretConfig FileObjectConfig
 
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Resources) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "limits":
-			if err := json.Unmarshal([]byte(v), &strct.Limits); err != nil {
-				return err
-			}
-		case "reservations":
-			if err := json.Unmarshal([]byte(v), &strct.Reservations); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *RestartPolicy) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "condition" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"condition\": ")
-	if tmp, err := json.Marshal(strct.Condition); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "delay" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"delay\": ")
-	if tmp, err := json.Marshal(strct.Delay); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "max_attempts" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"max_attempts\": ")
-	if tmp, err := json.Marshal(strct.MaxAttempts); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "window" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"window\": ")
-	if tmp, err := json.Marshal(strct.Window); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *RestartPolicy) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "condition":
-			if err := json.Unmarshal([]byte(v), &strct.Condition); err != nil {
-				return err
-			}
-		case "delay":
-			if err := json.Unmarshal([]byte(v), &strct.Delay); err != nil {
-				return err
-			}
-		case "max_attempts":
-			if err := json.Unmarshal([]byte(v), &strct.MaxAttempts); err != nil {
-				return err
-			}
-		case "window":
-			if err := json.Unmarshal([]byte(v), &strct.Window); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *RollbackConfig) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "delay" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"delay\": ")
-	if tmp, err := json.Marshal(strct.Delay); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "failure_action" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"failure_action\": ")
-	if tmp, err := json.Marshal(strct.FailureAction); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "max_failure_ratio" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"max_failure_ratio\": ")
-	if tmp, err := json.Marshal(strct.MaxFailureRatio); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "monitor" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"monitor\": ")
-	if tmp, err := json.Marshal(strct.Monitor); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "order" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"order\": ")
-	if tmp, err := json.Marshal(strct.Order); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "parallelism" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"parallelism\": ")
-	if tmp, err := json.Marshal(strct.Parallelism); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *RollbackConfig) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "delay":
-			if err := json.Unmarshal([]byte(v), &strct.Delay); err != nil {
-				return err
-			}
-		case "failure_action":
-			if err := json.Unmarshal([]byte(v), &strct.FailureAction); err != nil {
-				return err
-			}
-		case "max_failure_ratio":
-			if err := json.Unmarshal([]byte(v), &strct.MaxFailureRatio); err != nil {
-				return err
-			}
-		case "monitor":
-			if err := json.Unmarshal([]byte(v), &strct.Monitor); err != nil {
-				return err
-			}
-		case "order":
-			if err := json.Unmarshal([]byte(v), &strct.Order); err != nil {
-				return err
-			}
-		case "parallelism":
-			if err := json.Unmarshal([]byte(v), &strct.Parallelism); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Config) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "configs" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"configs\": ")
-	if tmp, err := json.Marshal(strct.Configs); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "networks" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"networks\": ")
-	if tmp, err := json.Marshal(strct.Networks); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "secrets" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"secrets\": ")
-	if tmp, err := json.Marshal(strct.Secrets); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "services" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"services\": ")
-	if tmp, err := json.Marshal(strct.Services); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// "Version" field is required
-	// only required object types supported for marshal checking (for now)
-	// Marshal the "version" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"version\": ")
-	buf.Write([]byte(fmt.Sprintf("%d", 3)))
-	comma = true
-	// Marshal the "volumes" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"volumes\": ")
-	if tmp, err := json.Marshal(strct.Volumes); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Config) UnmarshalJSON(b []byte) error {
-	var version string
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "configs":
-			if err := json.Unmarshal([]byte(v), &strct.Configs); err != nil {
-				return err
-			}
-		case "networks":
-			if err := json.Unmarshal([]byte(v), &strct.Networks); err != nil {
-				return err
-			}
-		case "secrets":
-			if err := json.Unmarshal([]byte(v), &strct.Secrets); err != nil {
-				return err
-			}
-		case "services":
-			if err := json.Unmarshal([]byte(v), &strct.Services); err != nil {
-				return err
-			}
-		case "version":
-			version = string(v)
-		case "volumes":
-			if err := json.Unmarshal([]byte(v), &strct.Volumes); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	// check if version (a required property) was received
-	if version != "3" {
-		return fmt.Errorf("expected \"version\" 3 but found %v", version)
-	}
-	return nil
-}
-
-func (strct *Secret) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "external" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"external\": ")
-	if tmp, err := json.Marshal(strct.External); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "file" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"file\": ")
-	if tmp, err := json.Marshal(strct.File); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "name" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"name\": ")
-	if tmp, err := json.Marshal(strct.Name); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Secret) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "external":
-			if err := json.Unmarshal([]byte(v), &strct.External); err != nil {
-				return err
-			}
-		case "file":
-			if err := json.Unmarshal([]byte(v), &strct.File); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "name":
-			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Service) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "build" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"build\": ")
-	if tmp, err := json.Marshal(strct.Build); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "cap_add" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"cap_add\": ")
-	if tmp, err := json.Marshal(strct.CapAdd); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "cap_drop" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"cap_drop\": ")
-	if tmp, err := json.Marshal(strct.CapDrop); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "cgroup_parent" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"cgroup_parent\": ")
-	if tmp, err := json.Marshal(strct.CgroupParent); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "command" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"command\": ")
-	if tmp, err := json.Marshal(strct.Command); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "configs" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"configs\": ")
-	if tmp, err := json.Marshal(strct.Configs); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "container_name" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"container_name\": ")
-	if tmp, err := json.Marshal(strct.ContainerName); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "credential_spec" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"credential_spec\": ")
-	if tmp, err := json.Marshal(strct.CredentialSpec); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "depends_on" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"depends_on\": ")
-	if tmp, err := json.Marshal(strct.DependsOn); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "deploy" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"deploy\": ")
-	if tmp, err := json.Marshal(strct.Deploy); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "devices" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"devices\": ")
-	if tmp, err := json.Marshal(strct.Devices); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "dns" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"dns\": ")
-	if tmp, err := json.Marshal(strct.Dns); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "dns_search" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"dns_search\": ")
-	if tmp, err := json.Marshal(strct.DnsSearch); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "domainname" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"domainname\": ")
-	if tmp, err := json.Marshal(strct.Domainname); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "entrypoint" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"entrypoint\": ")
-	if tmp, err := json.Marshal(strct.Entrypoint); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "env_file" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"env_file\": ")
-	if tmp, err := json.Marshal(strct.EnvFile); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "environment" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"environment\": ")
-	if tmp, err := json.Marshal(strct.Environment); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "expose" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"expose\": ")
-	if tmp, err := json.Marshal(strct.Expose); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "external_links" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"external_links\": ")
-	if tmp, err := json.Marshal(strct.ExternalLinks); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "extra_hosts" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"extra_hosts\": ")
-	if tmp, err := json.Marshal(strct.ExtraHosts); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "healthcheck" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"healthcheck\": ")
-	if tmp, err := json.Marshal(strct.Healthcheck); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "hostname" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"hostname\": ")
-	if tmp, err := json.Marshal(strct.Hostname); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "image" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"image\": ")
-	if tmp, err := json.Marshal(strct.Image); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "init" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"init\": ")
-	if tmp, err := json.Marshal(strct.Init); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "ipc" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"ipc\": ")
-	if tmp, err := json.Marshal(strct.Ipc); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "isolation" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"isolation\": ")
-	if tmp, err := json.Marshal(strct.Isolation); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "links" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"links\": ")
-	if tmp, err := json.Marshal(strct.Links); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "logging" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"logging\": ")
-	if tmp, err := json.Marshal(strct.Logging); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "mac_address" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"mac_address\": ")
-	if tmp, err := json.Marshal(strct.MacAddress); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "network_mode" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"network_mode\": ")
-	if tmp, err := json.Marshal(strct.NetworkMode); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "networks" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"networks\": ")
-	if tmp, err := json.Marshal(strct.Networks); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "pid" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"pid\": ")
-	if tmp, err := json.Marshal(strct.Pid); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "ports" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"ports\": ")
-	if tmp, err := json.Marshal(strct.Ports); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "privileged" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"privileged\": ")
-	if tmp, err := json.Marshal(strct.Privileged); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "read_only" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"read_only\": ")
-	if tmp, err := json.Marshal(strct.ReadOnly); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "restart" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"restart\": ")
-	if tmp, err := json.Marshal(strct.Restart); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "secrets" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"secrets\": ")
-	if tmp, err := json.Marshal(strct.Secrets); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "security_opt" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"security_opt\": ")
-	if tmp, err := json.Marshal(strct.SecurityOpt); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "shm_size" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"shm_size\": ")
-	if tmp, err := json.Marshal(strct.ShmSize); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "stdin_open" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"stdin_open\": ")
-	if tmp, err := json.Marshal(strct.StdinOpen); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "stop_grace_period" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"stop_grace_period\": ")
-	if tmp, err := json.Marshal(strct.StopGracePeriod); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "stop_signal" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"stop_signal\": ")
-	if tmp, err := json.Marshal(strct.StopSignal); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "sysctls" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"sysctls\": ")
-	if tmp, err := json.Marshal(strct.Sysctls); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "tmpfs" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"tmpfs\": ")
-	if tmp, err := json.Marshal(strct.Tmpfs); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "tty" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"tty\": ")
-	if tmp, err := json.Marshal(strct.Tty); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "ulimits" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"ulimits\": ")
-	if tmp, err := json.Marshal(strct.Ulimits); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "user" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"user\": ")
-	if tmp, err := json.Marshal(strct.User); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "userns_mode" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"userns_mode\": ")
-	if tmp, err := json.Marshal(strct.UsernsMode); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "volumes" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"volumes\": ")
-	if tmp, err := json.Marshal(strct.Volumes); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "working_dir" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"working_dir\": ")
-	if tmp, err := json.Marshal(strct.WorkingDir); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Service) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "build":
-			if err := json.Unmarshal([]byte(v), &strct.Build); err != nil {
-				return err
-			}
-		case "cap_add":
-			if err := json.Unmarshal([]byte(v), &strct.CapAdd); err != nil {
-				return err
-			}
-		case "cap_drop":
-			if err := json.Unmarshal([]byte(v), &strct.CapDrop); err != nil {
-				return err
-			}
-		case "cgroup_parent":
-			if err := json.Unmarshal([]byte(v), &strct.CgroupParent); err != nil {
-				return err
-			}
-		case "command":
-			if err := json.Unmarshal([]byte(v), &strct.Command); err != nil {
-				return err
-			}
-		case "configs":
-			if err := json.Unmarshal([]byte(v), &strct.Configs); err != nil {
-				return err
-			}
-		case "container_name":
-			if err := json.Unmarshal([]byte(v), &strct.ContainerName); err != nil {
-				return err
-			}
-		case "credential_spec":
-			if err := json.Unmarshal([]byte(v), &strct.CredentialSpec); err != nil {
-				return err
-			}
-		case "depends_on":
-			if err := json.Unmarshal([]byte(v), &strct.DependsOn); err != nil {
-				return err
-			}
-		case "deploy":
-			if err := json.Unmarshal([]byte(v), &strct.Deploy); err != nil {
-				return err
-			}
-		case "devices":
-			if err := json.Unmarshal([]byte(v), &strct.Devices); err != nil {
-				return err
-			}
-		case "dns":
-			if err := json.Unmarshal([]byte(v), &strct.Dns); err != nil {
-				return err
-			}
-		case "dns_search":
-			if err := json.Unmarshal([]byte(v), &strct.DnsSearch); err != nil {
-				return err
-			}
-		case "domainname":
-			if err := json.Unmarshal([]byte(v), &strct.Domainname); err != nil {
-				return err
-			}
-		case "entrypoint":
-			if err := json.Unmarshal([]byte(v), &strct.Entrypoint); err != nil {
-				return err
-			}
-		case "env_file":
-			if err := json.Unmarshal([]byte(v), &strct.EnvFile); err != nil {
-				return err
-			}
-		case "environment":
-			if err := json.Unmarshal([]byte(v), &strct.Environment); err != nil {
-				return err
-			}
-		case "expose":
-			if err := json.Unmarshal([]byte(v), &strct.Expose); err != nil {
-				return err
-			}
-		case "external_links":
-			if err := json.Unmarshal([]byte(v), &strct.ExternalLinks); err != nil {
-				return err
-			}
-		case "extra_hosts":
-			if err := json.Unmarshal([]byte(v), &strct.ExtraHosts); err != nil {
-				return err
-			}
-		case "healthcheck":
-			if err := json.Unmarshal([]byte(v), &strct.Healthcheck); err != nil {
-				return err
-			}
-		case "hostname":
-			if err := json.Unmarshal([]byte(v), &strct.Hostname); err != nil {
-				return err
-			}
-		case "image":
-			if err := json.Unmarshal([]byte(v), &strct.Image); err != nil {
-				return err
-			}
-		case "init":
-			if err := json.Unmarshal([]byte(v), &strct.Init); err != nil {
-				return err
-			}
-		case "ipc":
-			if err := json.Unmarshal([]byte(v), &strct.Ipc); err != nil {
-				return err
-			}
-		case "isolation":
-			if err := json.Unmarshal([]byte(v), &strct.Isolation); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "links":
-			if err := json.Unmarshal([]byte(v), &strct.Links); err != nil {
-				return err
-			}
-		case "logging":
-			if err := json.Unmarshal([]byte(v), &strct.Logging); err != nil {
-				return err
-			}
-		case "mac_address":
-			if err := json.Unmarshal([]byte(v), &strct.MacAddress); err != nil {
-				return err
-			}
-		case "network_mode":
-			if err := json.Unmarshal([]byte(v), &strct.NetworkMode); err != nil {
-				return err
-			}
-		case "networks":
-			if err := json.Unmarshal([]byte(v), &strct.Networks); err != nil {
-				return err
-			}
-		case "pid":
-			if err := json.Unmarshal([]byte(v), &strct.Pid); err != nil {
-				return err
-			}
-		case "ports":
-			if err := json.Unmarshal([]byte(v), &strct.Ports); err != nil {
-				return err
-			}
-		case "privileged":
-			if err := json.Unmarshal([]byte(v), &strct.Privileged); err != nil {
-				return err
-			}
-		case "read_only":
-			if err := json.Unmarshal([]byte(v), &strct.ReadOnly); err != nil {
-				return err
-			}
-		case "restart":
-			if err := json.Unmarshal([]byte(v), &strct.Restart); err != nil {
-				return err
-			}
-		case "secrets":
-			if err := json.Unmarshal([]byte(v), &strct.Secrets); err != nil {
-				return err
-			}
-		case "security_opt":
-			if err := json.Unmarshal([]byte(v), &strct.SecurityOpt); err != nil {
-				return err
-			}
-		case "shm_size":
-			if err := json.Unmarshal([]byte(v), &strct.ShmSize); err != nil {
-				return err
-			}
-		case "stdin_open":
-			if err := json.Unmarshal([]byte(v), &strct.StdinOpen); err != nil {
-				return err
-			}
-		case "stop_grace_period":
-			if err := json.Unmarshal([]byte(v), &strct.StopGracePeriod); err != nil {
-				return err
-			}
-		case "stop_signal":
-			if err := json.Unmarshal([]byte(v), &strct.StopSignal); err != nil {
-				return err
-			}
-		case "sysctls":
-			if err := json.Unmarshal([]byte(v), &strct.Sysctls); err != nil {
-				return err
-			}
-		case "tmpfs":
-			if err := json.Unmarshal([]byte(v), &strct.Tmpfs); err != nil {
-				return err
-			}
-		case "tty":
-			if err := json.Unmarshal([]byte(v), &strct.Tty); err != nil {
-				return err
-			}
-		case "ulimits":
-			if err := json.Unmarshal([]byte(v), &strct.Ulimits); err != nil {
-				return err
-			}
-		case "user":
-			if err := json.Unmarshal([]byte(v), &strct.User); err != nil {
-				return err
-			}
-		case "userns_mode":
-			if err := json.Unmarshal([]byte(v), &strct.UsernsMode); err != nil {
-				return err
-			}
-		case "volumes":
-			if err := json.Unmarshal([]byte(v), &strct.Volumes); err != nil {
-				return err
-			}
-		case "working_dir":
-			if err := json.Unmarshal([]byte(v), &strct.WorkingDir); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *UpdateConfig) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "delay" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"delay\": ")
-	if tmp, err := json.Marshal(strct.Delay); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "failure_action" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"failure_action\": ")
-	if tmp, err := json.Marshal(strct.FailureAction); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "max_failure_ratio" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"max_failure_ratio\": ")
-	if tmp, err := json.Marshal(strct.MaxFailureRatio); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "monitor" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"monitor\": ")
-	if tmp, err := json.Marshal(strct.Monitor); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "order" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"order\": ")
-	if tmp, err := json.Marshal(strct.Order); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "parallelism" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"parallelism\": ")
-	if tmp, err := json.Marshal(strct.Parallelism); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *UpdateConfig) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "delay":
-			if err := json.Unmarshal([]byte(v), &strct.Delay); err != nil {
-				return err
-			}
-		case "failure_action":
-			if err := json.Unmarshal([]byte(v), &strct.FailureAction); err != nil {
-				return err
-			}
-		case "max_failure_ratio":
-			if err := json.Unmarshal([]byte(v), &strct.MaxFailureRatio); err != nil {
-				return err
-			}
-		case "monitor":
-			if err := json.Unmarshal([]byte(v), &strct.Monitor); err != nil {
-				return err
-			}
-		case "order":
-			if err := json.Unmarshal([]byte(v), &strct.Order); err != nil {
-				return err
-			}
-		case "parallelism":
-			if err := json.Unmarshal([]byte(v), &strct.Parallelism); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Volume) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-	comma := false
-	// Marshal the "driver" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"driver\": ")
-	if tmp, err := json.Marshal(strct.Driver); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "driver_opts" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"driver_opts\": ")
-	if tmp, err := json.Marshal(strct.DriverOpts); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "external" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"external\": ")
-	if tmp, err := json.Marshal(strct.External); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "labels" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"labels\": ")
-	if tmp, err := json.Marshal(strct.Labels); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "name" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"name\": ")
-	if tmp, err := json.Marshal(strct.Name); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Volume) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, v := range jsonMap {
-		switch k {
-		case "driver":
-			if err := json.Unmarshal([]byte(v), &strct.Driver); err != nil {
-				return err
-			}
-		case "driver_opts":
-			if err := json.Unmarshal([]byte(v), &strct.DriverOpts); err != nil {
-				return err
-			}
-		case "external":
-			if err := json.Unmarshal([]byte(v), &strct.External); err != nil {
-				return err
-			}
-		case "labels":
-			if err := json.Unmarshal([]byte(v), &strct.Labels); err != nil {
-				return err
-			}
-		case "name":
-			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
-
-func (strct *Volumes) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
-}
-
-func (strct *Volumes) UnmarshalJSON(b []byte) error {
-	var jsonMap map[string]json.RawMessage
-	if err := json.Unmarshal(b, &jsonMap); err != nil {
-		return err
-	}
-	// parse all the defined properties
-	for k, _ := range jsonMap {
-		switch k {
-		default:
-			return fmt.Errorf("additional property not allowed: \"" + k + "\"")
-		}
-	}
-	return nil
-}
+// ConfigObjConfig is the config for the swarm "Config" object
+type ConfigObjConfig FileObjectConfig
