@@ -2,29 +2,38 @@ package gocodeit
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-
 	"github.com/pkg/errors"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/yaml.v2"
 )
 
-type Gen struct {
-	Files
-
-	out string
-
+// Generator is a module that hep
+type Generator struct {
+	FilePool
 	Logger log.Logger
+
+	out       string
+	generated bool
 }
 
-func New(injs ...func(cmd *kingpin.CmdClause)) *Gen {
-	app := kingpin.New("gocodeit", "GoCodeIt")
+// New returns new Generator that parses os.Args as command line arguments.
+// It allows passing closure BEFORE parsing the flags to allow defining additional flags.
+//
+// NOTE: Read README.md before using. This is intentionally NOT following Golang library patterns like:
+// * It uses panics as the main error handling way.
+// * It creates CLI command inside constructor.
+// * It does not allow custom loggers etc
+func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
+	app := kingpin.New("gocodeit", "GoCodeIt: https://github.com/bwplotka/gocodeit")
 	app.HelpFlag.Short('h')
 
-	gen := app.Command("generate", "generate your everything!")
-	out := gen.Flag("output", "output directory").Short('o').Default("gcigen").String()
+	gen := app.Command("generate", "generates output files from all implemented and registered files (see Add Golang method).")
+	out := gen.Flag("output", "output directory for generated files.").Short('o').Default("gcigen").String()
 
 	for _, inj := range injs {
 		inj(gen)
@@ -61,14 +70,14 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Gen {
 		logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 	}
 
-	a := &Gen{
+	a := &Generator{
 		out: *out,
 
 		Logger: logger,
 	}
 	switch cmd {
 	case gen.FullCommand():
-		a.Files = Files{m: map[string]string{}}
+		a.FilePool = FilePool{m: map[string]string{}}
 		return a
 	}
 
@@ -78,18 +87,44 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Gen {
 	return nil
 }
 
-func (g *Gen) With(parts ...string) *Gen {
-	return &Gen{
+// With behaves like linux `cd` command. It allows to "walk" & organize output files in a desired way for ease of use.
+// Example:
+//
+// ```
+//  gen := With("mycompany.com", "production", "eu1", "kubernetes" "thanos")
+// ```
+func (g *Generator) With(parts ...string) *Generator {
+	// TODO(bwplotka): Support "..", to get back?
+
+	return &Generator{
 		Logger: g.Logger,
 		out:    g.out,
-		Files: Files{
+		FilePool: FilePool{
 			path: append(g.path, parts...),
 			m:    g.m,
 		},
 	}
 }
 
-func (g *Gen) Generate() {
+// Generate generates all the files that were registered before.
+func (g *Generator) Generate() {
+	if g.generated {
+		PanicErr(errors.New("generate method already invoked once."))
+	}
+	defer func() { g.generated = true }()
+
 	_ = level.Info(g.Logger).Log("msg", "generated output", "dir", g.out)
 	g.write(g.out)
+}
+
+// UnmarshalSecretFile allows to easily manage your secrets passed to Golang defined configuration via custom file.
+func UnmarshalSecretFile(file string, in interface{}) {
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		Panicf("read file from: %v", err)
+	}
+
+	if err := yaml.Unmarshal(b, in); err != nil {
+		Panicf("failed to unmarshal file from: %v", err)
+	}
 }
