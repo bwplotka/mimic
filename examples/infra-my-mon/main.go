@@ -5,8 +5,14 @@ import (
 	"github.com/bwplotka/gocodeit/encoding"
 	"github.com/bwplotka/gocodeit/providers/dockercompose"
 	"github.com/bwplotka/gocodeit/providers/prometheus"
+	"github.com/prometheus/common/config"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
+
+// This is not the best, but the simplest solution for secrets. See: README.md#Important: Guide & best practices
+type Secrets struct {
+	Alertmanager config.BasicAuth `yaml:"alertmanager"`
+}
 
 func main() {
 	var secretFile *string
@@ -15,33 +21,46 @@ func main() {
 			secretFile = cmd.Flag("secret-file", "YAML file with secrets").Required().String()
 		},
 	)
+
+	// Make sure to generate at the very end.
 	defer gci.Generate()
 
 	var secrets Secrets
 	gocodeit.UnmarshalSecretFile(*secretFile, &secrets)
+
+	// Start generating stuff.
 	genMyMonAll(gci, secrets)
 }
 
-func genMyMonAll(gci *gocodeit.Gen, secrets Secrets) {
+func genMyMonAll(gci *gocodeit.Generator, secrets Secrets) {
 	for _, env := range Environments {
 		gci := gci.With(env.Name)
 		for _, cl := range ClustersByEnv[env] {
 			gci := gci.With(cl.Name)
 
-			genMyMonDockerCompose(gci)
+			genMyMonDockerCompose(gci.With("deploy"))
+			genMyMonPrometheusConfig(gci.With("configs"), secrets)
 		}
 	}
-
 }
 
-func genMyMonPrometheusConfig(gci *gocodeit.Gen) {
+func genMyMonPrometheusConfig(gci *gocodeit.Generator, secrets Secrets) {
 	cfg := prometheus.Config{
+		AlertingConfig: prometheus.AlertingConfig{
+			AlertmanagerConfigs: []*prometheus.AlertmanagerConfig{
+				{
+					HTTPClientConfig: config.HTTPClientConfig{
+						BasicAuth: &secrets.Alertmanager,
+					},
+				},
+			},
+		},
 		ScrapeConfigs: []*prometheus.ScrapeConfig{},
 	}
 	gci.Add("prometheus.yaml", encoding.YAML(cfg))
 }
 
-func genMyMonDockerCompose(gci *gocodeit.Gen) {
+func genMyMonDockerCompose(gci *gocodeit.Generator) {
 	const (
 		prometheusDataVolume       = "prometheus-data"
 		prometheusDockerVolumePath = "/docker-volumes/prometheus-data"
@@ -55,22 +74,11 @@ func genMyMonDockerCompose(gci *gocodeit.Gen) {
 	// TODO(bwplotka): Add envoy, alertmanager, make sure docker is monitored as well.
 	dpl := dockercompose.Config{
 		Volumes: []dockercompose.VolumeConfig{
-			{
-				Name:   prometheusDataVolume,
-				Driver: "local",
-			},
-			{
-				Name:   prometheusConfigVolume,
-				Driver: "local",
-			},
+			{Name: prometheusDataVolume, Driver: "local"},
+			{Name: prometheusConfigVolume, Driver: "local"},
 		},
 
-		Networks: dockercompose.NetworkConfigs{
-			{
-				Name:   monitoringNet,
-				Driver: "bridge",
-			},
-		},
+		Networks: dockercompose.NetworkConfigs{{Name: monitoringNet, Driver: "bridge"}},
 
 		Services: dockercompose.Services{
 			{

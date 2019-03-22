@@ -1,5 +1,7 @@
 package main
 
+// Mini typed cluster & environment setup for inspiration.
+
 type Environment struct {
 	Name string
 }
@@ -30,7 +32,7 @@ var (
 		{
 			Name:        "prod-par1-mon0",
 			Environment: Production,
-			Desc:        "bwplotka.dev monitoring docker compose cluster; Scaleway.com",
+			Desc:        "bwplotka.dev monitoring docker based cluster",
 		},
 	}
 
@@ -39,6 +41,7 @@ var (
 )
 
 func init() {
+	// Fill the clusters into useful helpers like ClustersByName and ClustersByEnv in compile time etc.
 	for _, cl := range Clusters {
 		ClustersByName[cl.Name] = cl
 	}

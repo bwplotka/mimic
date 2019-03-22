@@ -2,7 +2,12 @@ package gocodeit
 
 import "fmt"
 
-// Panic is a simple combination of Sprintf+panic.
+// Panicf allows panic error propagation using sprintf-like formatting.
 func Panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
+	panic(fmt.Sprintf("gocodeit: "+format, a...))
+}
+
+// PanicErr allows to panic because of certain error.
+func PanicErr(err error) {
+	Panicf("failed to execute; err:", err)
 }

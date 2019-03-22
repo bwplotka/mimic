@@ -11,8 +11,9 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Stripped out Prometheus configuration from: https://github.com/prometheus/prometheus/blob/master/config/config.go
+// NOTE(bwplotka): Stripped out Prometheus configuration from: https://github.com/prometheus/prometheus/blob/master/config/config.go
 // We cannot import them directly easily as config package has cosmic number of dependencies (50+), dependency hell.
+// TODO(bwplotka): Contribute and strip deps in Prometheus upstream once we agree as Prometheus maintainers if that use case we want to be support.
 
 // Config is the top-level configuration for Prometheus's config files.
 type Config struct {

@@ -4,22 +4,29 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 
-	"gopkg.in/yaml.v2"
-
+	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-type Files struct {
+// FilePool is a struct for storing and managing files to be generated as part of an application run.
+type FilePool struct {
 	path []string
 
 	m map[string]string
 }
 
-func (f *Files) Add(fileName string, r io.Reader) {
+// Add adds a file to files pool. File is identified by filename.
+// It allows passing content of the file as io.Reader.
+//
+// NOTE: See gocodeit/encoding for different marshallers to use as io.Reader.
+func (f *FilePool) Add(fileName string, r io.Reader) {
+	if filepath.Base(fileName) != fileName {
+		Panicf("")
+	}
+
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		Panicf("failed to output: %s", err)
@@ -34,7 +41,7 @@ func (f *Files) Add(fileName string, r io.Reader) {
 	f.m[output] = string(b)
 }
 
-func (f *Files) sortedPaths() []string {
+func (f *FilePool) sortedPaths() []string {
 	var paths []string
 	for k := range f.m {
 		paths = append(paths, k)
@@ -43,20 +50,22 @@ func (f *Files) sortedPaths() []string {
 	return paths
 }
 
-func (f *Files) write(outputDir string) {
+func (f *FilePool) write(outputDir string) {
 	for file, contents := range f.m {
 		out := filepath.Join(outputDir, file)
-		if err := os.MkdirAll(path.Dir(out), 0755); err != nil {
-			Panicf("failed to create directory: %v", err)
+		if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
+			PanicErr(errors.Wrapf(err, "create directory %s", filepath.Dir(out)))
 		}
 
+		// TODO(bwplotka): Diff the things if something is already here.
+
 		if err := ioutil.WriteFile(out, []byte(contents), 0755); err != nil {
-			Panicf("failed to write file: %v", err)
+			PanicErr(errors.Wrapf(err, "write file to %s", out))
 		}
 	}
 }
 
-func (f *Files) diff(f2 *Files) string {
+func (f *FilePool) diff(f2 *FilePool) string {
 	var out string
 
 	for _, p := range f.sortedPaths() {
@@ -69,7 +78,7 @@ func (f *Files) diff(f2 *Files) string {
 				Context:  3,
 			})
 			if err != nil {
-				Panicf("diffing via difflib failed: %v", err)
+				PanicErr(errors.Wrap(err, "diffing via difflib"))
 			}
 			out += o
 		}
@@ -83,21 +92,10 @@ func (f *Files) diff(f2 *Files) string {
 				ToFile:   p,
 			})
 			if err != nil {
-				Panicf("diffing via difflib failed: %v", err)
+				PanicErr(errors.Wrap(err, "diffing via difflib"))
 			}
 			out += o
 		}
 	}
 	return out
-}
-
-func UnmarshalSecretFile(file string, in interface{}) {
-	b, err := ioutil.ReadFile(file)
-	if err != nil {
-		Panicf("read file from: %v", err)
-	}
-
-	if err := yaml.Unmarshal(b, in); err != nil {
-		Panicf("failed to unmarshal file from: %v", err)
-	}
 }
