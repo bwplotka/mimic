@@ -130,6 +130,7 @@ func genMyMonDockerCompose(gci *gocodeit.Generator, cl *Cluster, secrets Secrets
 	var (
 		promReplicas = uint64(1)
 	)
+	//Top-level object must be a mapping
 
 	genMyMonPrometheusConfig(gci.With("configs"), cl, promPort, nodeExpPort, dockerdPort, secrets)
 
