@@ -45,7 +45,7 @@ func genMyMonAll(gci *gocodeit.Generator, secrets Secrets) {
 		for _, cl := range ClustersByEnv[env] {
 			gci := gci.With(cl.Name)
 
-			genMyMonDockerCompose(gci.With("deploy"))
+			genMyMonDockerCompose(gci.With("deploy"), cl, secrets)
 		}
 	}
 }
