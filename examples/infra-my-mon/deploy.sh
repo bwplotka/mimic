@@ -15,9 +15,9 @@ mkdir -p "/docker-volumes/prometheus-data"
 mkdir -p "/docker-volumes/prometheus-config"
 
 # Generate yamls.
-go run ./examples/infra-my-mon generate --secret-file=secrets.yaml
+go run github.com/bwplotka/gocodeit/examples/infra-my-mon generate --secret-file=secrets.yaml
 
-cp ${DIR}/gcigen/deploy/config/prometheus.yaml /docker-volumes/prometheus-config
+cp gcigen/deploy/config/prometheus.yaml /docker-volumes/prometheus-config
 
-docker stack -c ${DIR}/gcigen/deploy/mon-compose.yaml my-mon
+docker stack -c gcigen/deploy/mon-compose.yaml my-mon
 
