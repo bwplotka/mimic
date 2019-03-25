@@ -15,26 +15,38 @@
 
 ## Why? 
 
-Because we learnt that this approach is the best, the hard way.
+Because we learnt that this approach is the best, the hard way. :rage4:
 
-TBD..
+Why you should define your templates/infra/configs in Golang?
 
-Benefits: What else..
-
-* Reduce incompatibility issues by using typed definitions:
-
-  Imagine this: you can get feedback early that the type you used in your Kubernetes stateful set definition’s field is wrong! 
-  Or the field you used in the configuration file does not exist anymore in version 2.0 of Prometheus. 
+* Golang is a strongly **typed** language. This means that compiler and IDE of your choice will *massively* help you 
+  find what config fields certain config allows, what values enum expects and what is the type of each field.
   
-* Quick feedback loop. Catch most mistakes and incompatibilities in Golang in-compile time, before you even deploy it further.
+* Golang recommends [goDoc formatting](https://blog.golang.org/godoc-documenting-go-code), which means that you can leverage 
+  native comments for each struct's fields to document behaviour or details related to the config field. Just go to config struct
+  source code via IDE and check what each fields actually means! See [this great Kubernetes struct](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go#L55) as an example.
+   
+* Reduce incompatibilities and unknowns to minimum. Golang allows versioned dependency management. This means that you if project you
+  define configs or definitions against, is in Golang or uses configuration defined by protobuf, you can natively import such typed config 
+  **directly** from source. To generate your configuration/definitions, you can fill exactly the same struct, as the project you configure will use 
+  for unmarshal. No more blind searches and surprises. It cannot be safer or simpler than this.
+
+  For example: you can get feedback early on, that the type you used in your Kubernetes stateful set definition’s field is wrong! 
+  Or the field you used in the Prometheus configuration file does not exist anymore in version 2.0 of Prometheus. 
+  
+* Quick feedback loop. Catch most mistakes and incompatibilities in Golang compile time, before you even deploy it further. 
+  As you probably know one of Golang goal is to have very fas compilation time, which feels like you are running a script.
 
 * Unit/Integration test your configuration, infrastructure and deployment. 
-    Want to check if you PromQL queries in Prometheus alerts works as expected? Just write unit test for those using e.g [this](https://github.com/prometheus/prometheus/blob/f678e27eb62ecf56e2b0bad82345925a4d6162a2/cmd/promtool/unittest.go#L37)
+    
+    For example: Want to check if you PromQL queries in Prometheus alerts works as expected? Just write unit test for those using e.g [this](https://github.com/prometheus/prometheus/blob/f678e27eb62ecf56e2b0bad82345925a4d6162a2/cmd/promtool/unittest.go#L37)
     Want to check if your alertmanager routing works? Create unit test using native routing logic imported directly from github.com/prometheus/alertmananger
 
-* Keep the set of the languages used in your organization to a minimum - just the cleanest and easiest to read language made: Golang.
+* Keep the set of the languages used in your organization to a minimum - just one: Golang, which one of the cleanest and easiest to read languages made.
 
-Why Golang? TBD..
+* Associate things. If you create a Kubernetes Deployment that expects configMap A, it's sometimes easy to make a typo or forget to apply that configMap A.
+  With Golang you can associate those two together either by common constant string, or by literally referencing `ConfigMap.Name` in your Kubernetes Deployment. 
+  Catch the bugs early!
 
 ## What this project is: GoCodeIt
 
