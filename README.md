@@ -88,8 +88,10 @@ However this concept is a result of all the lessons and mistakes we learnt there
 4. `defer .Generate()` method. This will make sure all output files will be generate once at the very end.
 5. Start DEFINING your files using Golang code. Add them & organize using `gci.With` and `gci.Add` methods.
 
-Example: 
+   Example:
+
     ```go
+    
     package main
     
     import (
@@ -195,6 +197,7 @@ In details this means:
       clearly defined semantics for the system being configured, usually reflected by the name given to
       the constant or parameter.
     * If a value (or substring) occurs in multiple locations with no connection between them:
+      
       * If the values do not not need to be parametrised, use separate literals.
       * If the values need to be parameterised, use separate parameters.
     
