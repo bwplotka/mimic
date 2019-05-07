@@ -265,3 +265,7 @@ Please use GitHub issues and our slack `#gocodeit` for feedback and questions. P
   internal underlying Golang struct's code can change a lot. If this concept will be widely popular it will encourage project to:
     * either maintain your config structs as Kubernetes does (it is an API and well documented types)
     * define configuration file via [protobuf]() e.g like envoy [here](https://github.com/envoyproxy/envoy/tree/507191a36958bbeb1b11143fe0acb149f3f2fb00/api/envoy/config)
+    
+## Other solutions
+
+* https://github.com/cuelang/cue
