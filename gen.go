@@ -15,7 +15,6 @@ import (
 // Generator is a module that hep
 type Generator struct {
 	FilePool
-	Logger log.Logger
 
 	out       string
 	generated bool
@@ -70,14 +69,10 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 		logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 	}
 
-	a := &Generator{
-		out: *out,
-
-		Logger: logger,
-	}
+	a := &Generator{out: *out}
 	switch cmd {
 	case gen.FullCommand():
-		a.FilePool = FilePool{m: map[string]string{}}
+		a.FilePool = FilePool{Logger: logger, m: map[string]string{}}
 		return a
 	}
 
@@ -97,11 +92,11 @@ func (g *Generator) With(parts ...string) *Generator {
 	// TODO(bwplotka): Support "..", to get back?
 
 	return &Generator{
-		Logger: g.Logger,
-		out:    g.out,
+		out: g.out,
 		FilePool: FilePool{
-			path: append(g.path, parts...),
-			m:    g.m,
+			Logger: g.Logger,
+			path:   append(g.path, parts...),
+			m:      g.m,
 		},
 	}
 }
