@@ -32,7 +32,9 @@ func main() {
 	// Make sure to generate at the very end.
 	defer gci.Generate()
 
-	// Generate prometheus for backend of remote read.
+	// Generate resources for remote read tests.
+
+	// Baseline.
 	genRRTestPrometheus(gci, "prom-rr-test")
 }
 

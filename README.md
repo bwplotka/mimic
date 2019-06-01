@@ -63,12 +63,12 @@ It's not about using exactly this library that we aim for. The implementation mi
 So what `GoCodeIt` Go module includes?
 
 * [x] Minimal [providers](providers) package for config types that are not natively hosted as Golang code OR are not easily importable, yet.
-* [x] Examples:
-    * TODO: k8s example
-    * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](examples/infra-my-mon)
+* [x] Projects:
+    * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](projects/prom-remote-read-bench)
+    * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](projects/infra-my-mon)
     * You want to add your own example here? Write to us on Slack or file GH issue!
 
-`GoCodeIt` is used already on "production" for our personal projects infrastructure like [here](examples/infra-my-mon).
+`GoCodeIt` is used already on "production" for our personal projects infrastructure like [here](projects/infra-my-mon).
 
 ## What this project is NOT
 
@@ -151,7 +151,7 @@ Deploy in production by e.g just:
  * cloning your git project 
  * build tooling for distributing config files where you want, or just kubectl apply resources you generate etc.
 
-See other examples [here](examples)
+See other projects [here](projects)
 
 ## Important: Guide & best practices
 
