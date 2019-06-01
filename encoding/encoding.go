@@ -51,7 +51,7 @@ func YAML(in ...interface{}) io.Reader {
 		if extraString, ok := entry.(string); ok {
 			entryBytes = []byte(extraString)
 		} else {
-			b, err := yaml.Marshal(in)
+			b, err := yaml.Marshal(entry)
 			if err != nil {
 				return errReader{err: errors.Wrapf(err, "unable to marshal to YAML: %v", in)}
 			}
