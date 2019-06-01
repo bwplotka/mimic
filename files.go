@@ -7,12 +7,17 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 )
 
 // FilePool is a struct for storing and managing files to be generated as part of an application run.
 type FilePool struct {
+	Logger log.Logger
+
 	path []string
 
 	m map[string]string
@@ -59,6 +64,7 @@ func (f *FilePool) write(outputDir string) {
 
 		// TODO(bwplotka): Diff the things if something is already here.
 
+		_ = level.Debug(f.Logger).Log("msg", "writing file", "file", out)
 		if err := ioutil.WriteFile(out, []byte(contents), 0755); err != nil {
 			PanicErr(errors.Wrapf(err, "write file to %s", out))
 		}

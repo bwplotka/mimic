@@ -17,6 +17,7 @@ type errReader struct{ err error }
 
 func (r errReader) Read(_ []byte) (int, error) { return 0, r.err }
 
+// JSON returns reader that encodes anything to JSON.
 func JSON(in interface{}) io.Reader {
 	b, err := json.MarshalIndent(in, "", "  ")
 	if err != nil {
@@ -25,8 +26,8 @@ func JSON(in interface{}) io.Reader {
 	return bytes.NewBuffer(b)
 }
 
-// JSONPB should be used when serialising protobuf messages.
-// The jsonpb marshaler behaves slightly differently to go's built in marshaler.
+// JSONPB returns reader that encodes protobuf messages to JSON.
+// NOTE: The jsonpb marshaler behaves slightly differently to go's built in marshaler.
 func JSONPB(in proto.Message) io.Reader {
 	str, err := (&jsonpb.Marshaler{Indent: "  "}).MarshalToString(in.(proto.Message))
 	if err != nil {
@@ -35,6 +36,7 @@ func JSONPB(in proto.Message) io.Reader {
 	return bytes.NewBufferString(str)
 }
 
+// YAML returns reader that encodes anything to YAML.
 func YAML(in ...interface{}) io.Reader {
 	var concatDelim = []byte("---\n")
 
@@ -49,7 +51,7 @@ func YAML(in ...interface{}) io.Reader {
 		if extraString, ok := entry.(string); ok {
 			entryBytes = []byte(extraString)
 		} else {
-			b, err := yaml.Marshal(in)
+			b, err := yaml.Marshal(entry)
 			if err != nil {
 				return errReader{err: errors.Wrapf(err, "unable to marshal to YAML: %v", in)}
 			}
@@ -65,8 +67,7 @@ func YAML(in ...interface{}) io.Reader {
 	return bytes.NewBuffer(bytes.Join(res, concatDelim))
 }
 
-// GogoJSONPB should be used when serialising protobuf messages that were generated
-// using gogo/protobuf library.
+// GogoJSONPB returns reader that encodes protobuf messages built with gogo/protobuf implementation.
 func GogoJSONPB(in protogg.Message) io.Reader {
 	str, err := (&jsonggpb.Marshaler{Indent: " "}).MarshalToString(in.(protogg.Message))
 	if err != nil {

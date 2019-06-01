@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bwplotka/gocodeit/providers/prometheus/discovery/config"
+	sdconfig "github.com/bwplotka/gocodeit/providers/prometheus/discovery/config"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 )
@@ -69,8 +69,8 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig config.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig  `yaml:",inline"`
+	ServiceDiscoveryConfig sdconfig.ServiceDiscoveryConfig `yaml:",inline"`
+	HTTPClientConfig       config_util.HTTPClientConfig    `yaml:",inline"`
 
 	// List of target relabel configurations.
 	RelabelConfigs []*RelabelConfig `yaml:"relabel_configs,omitempty"`
@@ -89,8 +89,8 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig config.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig  `yaml:",inline"`
+	ServiceDiscoveryConfig sdconfig.ServiceDiscoveryConfig `yaml:",inline"`
+	HTTPClientConfig       config_util.HTTPClientConfig    `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
 	Scheme string `yaml:"scheme,omitempty"`
