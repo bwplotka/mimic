@@ -8,12 +8,12 @@ cd ${DIR}
 
 TARGET_URL=$1
 
-MIN_T=$(($(date +%s%N -d "-10 hours")/1000000))
+MIN_T=$(($(date +%s%N -d "-26 hours")/1000000))
 MAX_T=$(($(date +%s%N -d "-2 hours")/1000000))
 
 date
-echo "Getting Series from 'min_time'=${MIN_T},'max_time'=${MAX_T}"
-
+echo "Fetching 10k series StoreAPI.Series from sidecar via RR"
+echo "'min_time'=${MIN_T} -26h 'max_time'=${MAX_T} -2h"
 GOGOPROTO_ROOT="$(GO111MODULE=on go list -f '{{ .Dir }}' -m github.com/gogo/protobuf)"
 
 time /home/bartek/Repos/gocodeit/.bin/grpcurl \
