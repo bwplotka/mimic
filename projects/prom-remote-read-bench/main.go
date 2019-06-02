@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/prometheus/common/model"
 	"io/ioutil"
 	"path"
 
@@ -23,8 +24,25 @@ const (
 	selectorName = "app"
 )
 
-// This is not the best, but the simplest solution for secrets. See: README.md#Important: Guide & best practices
-type Secrets struct{}
+/*
+
+Test procedure:
+
+* Generate YAMLs from definitions:
+  * `go run github.com/bwplotka/gocodeit/projects/prom-remote-read-bench generate`
+
+* Apply baseline:
+  * `kubectl apply -f gcigen/prom-rr-test.yaml`
+
+* Forward gRPC sidecar port:
+  * `kubectl port-forward pod/prom-rr-test-0 1234:19090`
+
+* Perform tests using test.sh (modifying parameters in script itself - heavy queries!)
+  * This performs heavy queries against Thanos gRPC Store.Series of sidecar which will proxy
+requests as remote read to Prometheus
+  * `bash ./projects/prom-remote-read-bench/test.sh localhost:1234`
+
+*/
 
 func main() {
 	gci := gocodeit.New()
@@ -48,32 +66,35 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 
 		namespace = "bartek"
 
-		httpPort          = 80
-		containerHTTPPort = 9090
-		pushGatewayPort   = 9091
-		httpSidecarPort   = 19190
-		grpcSidecarPort   = 19090
-
-		blockgenImage = "improbable/blockgen:master-f39ecb9fa4f"
+		httpPort        = 9090
+		httpSidecarPort = 19190
+		grpcSidecarPort = 19090
+		blockgenImage   = "improbable/blockgen:master-894c9481c4"
 		// Generate million series.
-		blockgenInput = `{
+		blockgenInput = `[{
   "type": "gauge",
   "jitter": 20,
   "max": 200000000,
   "min": 100000000,
-  "result": {multiplier:1000000, resultType":"vector","result":[{"metric":{"__name__":"kube_pod_container_resource_limits_memory_bytes","cluster":"eu1","container":"addon-resizer","instance":"172.17.0.9:8080","job":"kube-state-metrics","namespace":"kube-system","node":"minikube","pod":"kube-state-metrics-68f6cc566c-vp566"}}]}
-}`
+  "result": {"multiplier":10000,"resultType":"vector","result":[{"metric":{"__name__":"kube_pod_container_resource_limits_memory_bytes","cluster":"eu1","container":"addon-resizer","instance":"172.17.0.9:8080","job":"kube-state-metrics","namespace":"kube-system","node":"minikube","pod":"kube-state-metrics-68f6cc566c-vp566"}}]}
+}]`
 		promVersion   = "v2.10.0"
 		thanosVersion = "v0.5.0-rc.0"
 	)
 	var (
 		promDataPath    = path.Join(sharedDataPath, "prometheus")
-		prometheusImage = fmt.Sprintf("quay.io/prometheus:%s", promVersion)
+		prometheusImage = fmt.Sprintf("quay.io/prometheus/prometheus:%s", promVersion)
 		thanosImage     = fmt.Sprintf("improbable/thanos:%s", thanosVersion)
 	)
 
 	// Empty configuration, we don't need any scrape.
-	cfgBytes, err := ioutil.ReadAll(encoding.YAML(prometheus.Config{}))
+	cfgBytes, err := ioutil.ReadAll(encoding.YAML(prometheus.Config{
+		GlobalConfig: prometheus.GlobalConfig{
+			ExternalLabels: map[model.LabelName]model.LabelValue{
+				"replica": "0",
+			},
+		},
+	}))
 	if err != nil {
 		gocodeit.PanicErr(err)
 	}
@@ -122,8 +143,8 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "http",
-					Port:       containerHTTPPort,
-					TargetPort: intstr.FromInt(containerHTTPPort),
+					Port:       httpPort,
+					TargetPort: intstr.FromInt(httpPort),
 				},
 				{
 					Name:       "grpc-sidecar",
@@ -144,19 +165,20 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		Image:   blockgenImage,
 		Command: []string{"/bin/blockgen"},
 		Args: []string{
+			"synthetic",
 			fmt.Sprintf("--input=%s", blockgenInput),
 			fmt.Sprintf("--output-dir=%s", promDataPath),
-			"--retention=2d",
+			"--retention=24h",
 		},
 		VolumeMounts: []corev1.VolumeMount{sharedVM.VolumeMount},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
 		},
 	}
@@ -165,18 +187,18 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		Name:  "prometheus",
 		Image: prometheusImage,
 		Args: []string{
-			fmt.Sprintf("--prometheus.file=%v/prometheus.yaml", sharedDataPath),
+			fmt.Sprintf("--config.file=%v/prometheus.yaml", configVolumeMount),
 			"--log.level=info",
 			// Unlimited RR.
-			"--storage.remote.read-concurrent-limit=0",
-			"--storage.remote.read-sample-limit=0",
+			"--storage.remote.read-concurrent-limit=99999",
+			"--storage.remote.read-sample-limit=9999999999999999",
 			fmt.Sprintf("--storage.tsdb.path=%s", promDataPath),
 			"--storage.tsdb.min-block-duration=2h",
 			// Avoid compaction for less moving parts in results.
 			"--storage.tsdb.max-block-duration=2h",
-			"--storage.tsdb.retention=2d",
-			"--web.enable-lifecycle=true",
-			"--web.enable-admin-api=true",
+			"--storage.tsdb.retention.time=2d",
+			"--web.enable-lifecycle",
+			"--web.enable-admin-api",
 		},
 		Env: []corev1.EnvVar{
 			{Name: "HOSTNAME", ValueFrom: &corev1.EnvVarSource{
@@ -189,7 +211,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(int(containerHTTPPort)),
+					Port: intstr.FromInt(int(httpPort)),
 					Path: "-/ready",
 				},
 			},
@@ -198,7 +220,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "http",
-				ContainerPort: containerHTTPPort,
+				ContainerPort: httpPort,
 			},
 		},
 		VolumeMounts: volumes.VolumesAndMounts{promConfigAndMount.VolumeAndMount(), sharedVM}.VolumeMounts(),
@@ -209,11 +231,11 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
 		},
 	}
@@ -229,7 +251,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 			"--debug.name=$(POD_NAME)",
 			fmt.Sprintf("--http-address=0.0.0.0:%d", httpSidecarPort),
 			fmt.Sprintf("--grpc-address=0.0.0.0:%d", grpcSidecarPort),
-			fmt.Sprintf("--prometheus.url=http://localhost:%d", containerHTTPPort),
+			fmt.Sprintf("--prometheus.url=http://localhost:%d", httpPort),
 			fmt.Sprintf("--tsdb.path=%s", promDataPath),
 		},
 		Env: []corev1.EnvVar{
@@ -306,5 +328,5 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 		},
 	}
 
-	gci.Add(name+".yaml", encoding.YAML(set, srv, promConfigAndMount.ConfigMap()))
+	gci.Add(name+".yaml", encoding.GhodssYAML(set, srv, promConfigAndMount.ConfigMap()))
 }

@@ -5,16 +5,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	ghodssyaml "github.com/ghodss/yaml"
 )
 
-func TestYAML_Encoding2Structs(t *testing.T) {
+func TestYaml_Encoding2Structs(t *testing.T) {
 	type A struct {
 		Field1 string
 		Field2 int
 		Inner  *A
 	}
 
-	b, err := ioutil.ReadAll(YAML(
+	b, err := ioutil.ReadAll(yaml(
+		ghodssyaml.Marshal,
 		A{
 			Field1: "1",
 			Field2: 1,

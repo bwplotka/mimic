@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/ghodss/yaml"
+	ghodssyaml "github.com/ghodss/yaml"
 	jsonggpb "github.com/gogo/protobuf/jsonpb"
 	protogg "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	yaml2 "gopkg.in/yaml.v2"
 )
 
 type errReader struct{ err error }
@@ -36,8 +37,23 @@ func JSONPB(in proto.Message) io.Reader {
 	return bytes.NewBufferString(str)
 }
 
-// YAML returns reader that encodes anything to YAML.
+// GhodssYAML returns reader that encodes anything to YAML using github.com/ghodss/yaml.
+// Desired for e.g:
+// * Kubernetes
+func GhodssYAML(in ...interface{}) io.Reader {
+	return yaml(ghodssyaml.Marshal, in...)
+}
+
+// YAML returns reader that encodes anything to YAML using gopkg.in/yaml.v2.
+// Desired for e.g:
+// * Prometheus, Alertmanager configuration
 func YAML(in ...interface{}) io.Reader {
+	return yaml(yaml2.Marshal, in...)
+}
+
+type MarshalFunc func(o interface{}) ([]byte, error)
+
+func yaml(marshalFn MarshalFunc, in ...interface{}) io.Reader {
 	var concatDelim = []byte("---\n")
 
 	if len(in) == 0 {
@@ -51,7 +67,7 @@ func YAML(in ...interface{}) io.Reader {
 		if extraString, ok := entry.(string); ok {
 			entryBytes = []byte(extraString)
 		} else {
-			b, err := yaml.Marshal(entry)
+			b, err := marshalFn(entry)
 			if err != nil {
 				return errReader{err: errors.Wrapf(err, "unable to marshal to YAML: %v", in)}
 			}
