@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/gocodeit)](https://goreportcard.com/report/github.com/bwplotka/gocodeit) 
 [![GoDoc](https://godoc.org/github.com/bwplotka/gocodeit?status.svg)](https://godoc.org/github.com/bwplotka/gocodeit)
 
-`GoCodeIt` (`gci`): Golang module showcasing an awesome **concept** for:
+`GoCodeIt` (`gci`): Golang module showcasing a **concept** for:
 
 * Defining Configuration (e.g Envoy, Prometheus, Alertmanager, Nginx etc)
 * Defining Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Prometheus Alerts, Rules, Grafana Dashaboards etc)
@@ -96,6 +96,27 @@ Now you are ready to start defining your own resources!
 
 See other example or actually useful personal projects [here](projects)
 
+## What this project is: GoCodeIt
+
+This projects is to show the idea. A good pattern that we believe is valuable for everyone that has to deploy anything on any infrastructure, on high enough scale and in reproducible way. 
+
+*Don't use this implementation if you don't want to*. Instead, **be inspired to create your own Golang helpers to generate Configuration, Infrastructure and Deployment definitions from Golang code!**
+
+Still, this project be maintained and available for your use as a library.
+
+* Share the Go templates you create. 
+* Share the Go onfiguration structs for non-Golang projects. 
+* Share the Go unit/integration/acceptance tests against certain providers's definitions.
+* Share best practices and your experience!
+
+So what `GoCodeIt` Go module includes?
+
+* [x] Minimal [providers](providers) package for config types that are not natively hosted as Golang code OR are not easily importable (yet).
+* [x] Projects:
+    * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](projects/prom-remote-read-bench)
+    * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](projects/infra-my-mon)
+    * You want to add your own example here? Write to us on Slack or file GH issue!
+
 ## Why? 
 
 Because we learnt that this approach is quite beneficial, the hard way. :rage4:
@@ -130,28 +151,6 @@ Why you should define your templates/infra/configs in Golang?
 * Associate things. If you create a Kubernetes Deployment that expects configMap A, it's sometimes easy to make a typo or forget to apply that configMap A.
   With Golang you can associate those two together either by common constant string, or by literally referencing `ConfigMap.Name` in your Kubernetes Deployment. 
   Catch the bugs early!
-
-## What this project is: GoCodeIt
-
-This projects is to show idea. An awesome pattern that we believe, everyone, especially backend engineers should use. 
-It's not about using exactly this library that we aim for. The implementation might be not perfect and it was created from scratch based on the lessons we learnt. 
-
-*Don't use this implementation* if you don't want to. Instead, **be inspired to create your own Golang helpers to generate Configuration, Infrastructure and Deployment definitions from Golang code!**
-
-* Share the Go templates you create. 
-* Share the Go onfiguration structs for non-Golang projects. 
-* Share the Go unit/integration/acceptance tests against certain providers's definitions.
-* Share best practices and your experience!
-
-So what `GoCodeIt` Go module includes?
-
-* [x] Minimal [providers](providers) package for config types that are not natively hosted as Golang code OR are not easily importable, yet.
-* [x] Projects:
-    * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](projects/prom-remote-read-bench)
-    * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](projects/infra-my-mon)
-    * You want to add your own example here? Write to us on Slack or file GH issue!
-
-`GoCodeIt` is used already on "production" for our personal projects infrastructure like [here](projects/infra-my-mon).
 
 ## What this project is NOT
 
