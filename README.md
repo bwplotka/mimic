@@ -89,11 +89,6 @@
  
 Now you are ready to start defining your own resources! 
 
-`gocodeit` helps your template and maintain your definition but those not solve deploying. The basic flow would be to
- * clone your git project in some CI/dev machine
- * `go run <your project> generate`
- * Distributing config files where you want, e,g just `kubectl apply` resources if it's Kubernetes etc.
-
 See other example or actually useful personal projects [here](projects)
 
 ## What this project is: GoCodeIt
