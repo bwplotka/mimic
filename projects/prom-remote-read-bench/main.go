@@ -53,10 +53,23 @@ func main() {
 	// Generate resources for remote read tests.
 
 	// Baseline.
-	genRRTestPrometheus(gci, "prom-rr-test")
+	genRRTestPrometheus(
+		gci,
+		"prom-rr-test",
+		"v2.11.0-rc.0-clear",
+		"v0.5.0",
+	)
+
+	// Streamed.
+	genRRTestPrometheus(
+		gci,
+		"prom-rr-test-streamed",
+		"v2.11.0-rc.0-rr-streaming",
+		"v0.5.0-rr-streamed2",
+	)
 }
 
-func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
+func genRRTestPrometheus(gci *gocodeit.Generator, name string, promVersion string, thanosVersion string) {
 	const (
 		replicas = 1
 
@@ -78,12 +91,10 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
   "min": 100000000,
   "result": {"multiplier":10000,"resultType":"vector","result":[{"metric":{"__name__":"kube_pod_container_resource_limits_memory_bytes","cluster":"eu1","container":"addon-resizer","instance":"172.17.0.9:8080","job":"kube-state-metrics","namespace":"kube-system","node":"minikube","pod":"kube-state-metrics-68f6cc566c-vp566"}}]}
 }]`
-		promVersion   = "v2.10.0"
-		thanosVersion = "v0.5.0-rc.0"
 	)
 	var (
 		promDataPath    = path.Join(sharedDataPath, "prometheus")
-		prometheusImage = fmt.Sprintf("quay.io/prometheus/prometheus:%s", promVersion)
+		prometheusImage = fmt.Sprintf("bplotka/prometheus:%s", promVersion)
 		thanosImage     = fmt.Sprintf("improbable/thanos:%s", thanosVersion)
 	)
 
@@ -206,6 +217,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 					FieldPath: "metadata.name",
 				},
 			}},
+			//{Name: "GODEBUG", Value:"madvdontneed=1"},
 		},
 		ImagePullPolicy: corev1.PullAlways,
 		ReadinessProbe: &corev1.Probe{
@@ -260,6 +272,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string) {
 					FieldPath: "metadata.name",
 				},
 			}},
+			//{Name: "GODEBUG", Value:"madvdontneed=1"},
 		},
 		Ports: []corev1.ContainerPort{
 			{
