@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Generator managed a pool of files that are generated and written from go code.
+// Generator managed a pool of files that are generated and defined in go code.
 type Generator struct {
 	FilePool
 
@@ -49,7 +49,6 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 	}
 
 	var logger log.Logger
-
 	{
 		var lvl level.Option
 		switch *logLevel {
@@ -100,7 +99,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 //   // gcigen/foo
 //   ...
 //   {
-//     gen = gen.With('bar')
+//     gen := gen.With('bar')
 //     // gcigen/foo/bar
 //   }
 //   // gcigen/foo
