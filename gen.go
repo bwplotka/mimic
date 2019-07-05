@@ -23,7 +23,7 @@ type Generator struct {
 // New returns new Generator that parses os.Args as command line arguments.
 // It allows passing closure BEFORE parsing the flags to allow defining additional flags.
 //
-// NOTE: Read README.md before using. This is intentionally NOT following Golang library patterns like:
+// NOTE: Read README.md before using. This is intentionally NOT following Go library patterns like:
 // * It uses panics as the main error handling way.
 // * It creates CLI command inside constructor.
 // * It does not allow custom loggers etc
@@ -31,7 +31,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 	app := kingpin.New("gocodeit", "GoCodeIt: https://github.com/bwplotka/gocodeit")
 	app.HelpFlag.Short('h')
 
-	gen := app.Command("generate", "generates output files from all implemented and registered files (see Add Golang method).")
+	gen := app.Command("generate", "generates output files from all registered files via Add method.")
 	out := gen.Flag("output", "output directory for generated files.").Short('o').Default("gcigen").String()
 
 	for _, inj := range injs {
@@ -112,7 +112,7 @@ func (g *Generator) Generate() {
 	g.write(g.out)
 }
 
-// UnmarshalSecretFile allows to easily manage your secrets passed to Golang defined configuration via custom file.
+// UnmarshalSecretFile allows to easily manage your secrets passed to Go defined configuration via custom file.
 func UnmarshalSecretFile(file string, in interface{}) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {

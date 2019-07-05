@@ -1,22 +1,22 @@
-# "Define your Deployments, Infrastructure and Configuration as a Golang Code"
+# "Define your Deployments, Infrastructure and Configuration as a Go Code"
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/gocodeit)](https://goreportcard.com/report/github.com/bwplotka/gocodeit) 
 [![GoDoc](https://godoc.org/github.com/bwplotka/gocodeit?status.svg)](https://godoc.org/github.com/bwplotka/gocodeit)
 
-`GoCodeIt` (`gci`): Golang module showcasing a **concept** for:
+`GoCodeIt` (`gci`): Go module showcasing a **concept** for:
 
 * Defining Configuration (e.g Envoy, Prometheus, Alertmanager, Nginx etc)
 * Defining Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Prometheus Alerts, Rules, Grafana Dashaboards etc)
 * Defining Deployments (e.g Docker compose, Kubernetes, etc)
 * Defining any other file with whatever file format
 
-...as a simple, templated, typed and testable Golang code!
+...as a simple, templated, typed and testable Go code!
 
 ## How to use it?
 
 1. Start new project, create git repository.
-1. Create a new golang file e.g `projects/example.go`
-1. Import gocodeit using Golang 1.12+ via `go get github.com/bwplotka/gocodeit`.
+1. Create a new Go file e.g `projects/example.go`
+1. Import gocodeit using Go 1.12+ via `go get github.com/bwplotka/gocodeit`.
 1. Add initial hooks in your `main` package using `gocodeit` library. For [example](projects/example.go):
 
     ```go
@@ -95,18 +95,18 @@ See other example or actually useful personal projects [here](projects)
 
 This projects is to show the idea. A good pattern that we believe is valuable for everyone that has to deploy anything on any infrastructure, on high enough scale and in reproducible way. 
 
-*Don't use this implementation if you don't want to*. Instead, **be inspired to create your own Golang helpers to generate Configuration, Infrastructure and Deployment definitions from Golang code!**
+*Don't use this implementation if you don't want to*. Instead, **be inspired to create your own Go helpers to generate Configuration, Infrastructure and Deployment definitions from Go code!**
 
 Still, this project be maintained and available for your use as a library.
 
 * Share the Go templates you create. 
-* Share the Go onfiguration structs for non-Golang projects. 
+* Share the Go onfiguration structs for non-Go projects. 
 * Share the Go unit/integration/acceptance tests against certain providers's definitions.
 * Share best practices and your experience!
 
 So what `GoCodeIt` Go module includes?
 
-* [x] Minimal [providers](providers) package for config types that are not natively hosted as Golang code OR are not easily importable (yet).
+* [x] Minimal [providers](providers) package for config types that are not natively hosted as Go code OR are not easily importable (yet).
 * [x] Projects:
     * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](projects/prom-remote-read-bench)
     * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](projects/infra-my-mon)
@@ -116,35 +116,35 @@ So what `GoCodeIt` Go module includes?
 
 Because we learnt that this approach is quite beneficial, the hard way. :rage4:
 
-Why you should define your templates/infra/configs in Golang?
+Why you should define your templates/infra/configs in Go?
 
-* Golang is a strongly **typed** language. This means that compiler and IDE of your choice will *massively* help you 
+* Go is a strongly **typed** language. This means that compiler and IDE of your choice will *massively* help you 
   find what config fields certain config allows, what values enum expects and what is the type of each field.
   
-* Golang recommends [goDoc formatting](https://blog.golang.org/godoc-documenting-go-code), which means that you can leverage 
+* Go recommends [goDoc formatting](https://blog.Go.org/godoc-documenting-go-code), which means that you can leverage 
   native comments for each struct's fields to document behaviour or details related to the config field. Just go to config struct
   source code via IDE and check what each fields actually means! See [this great Kubernetes struct](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go#L55) as an example.
    
-* Reduce incompatibilities and unknowns to minimum. Golang allows versioned dependency management. This means that you if project you
-  define configs or definitions against, is in Golang or uses configuration defined by protobuf, you can natively import such typed config 
+* Reduce incompatibilities and unknowns to minimum. Go allows versioned dependency management. This means that you if project you
+  define configs or definitions against, is in Go or uses configuration defined by protobuf, you can natively import such typed config 
   **directly** from source. To generate your configuration/definitions, you can fill exactly the same struct, as the project you configure will use 
   for unmarshal. No more blind searches and surprises. It cannot be safer or simpler than this.
 
   For example: you can get feedback early on, that the type you used in your Kubernetes stateful set definition’s field is wrong! 
   Or the field you used in the Prometheus configuration file does not exist anymore in version 2.0 of Prometheus. 
   
-* Quick feedback loop. Catch most mistakes and incompatibilities in Golang compile time, before you even deploy it further. 
-  As you probably know one of Golang goal is to have very fas compilation time, which feels like you are running a script.
+* Quick feedback loop. Catch most mistakes and incompatibilities in Go compile time, before you even deploy it further. 
+  As you probably know one of Go goal is to have very fas compilation time, which feels like you are running a script.
 
 * Unit/Integration test your configuration, infrastructure and deployment. 
     
     For example: Want to check if you PromQL queries in Prometheus alerts works as expected? Just write unit test for those using e.g [this](https://github.com/prometheus/prometheus/blob/f678e27eb62ecf56e2b0bad82345925a4d6162a2/cmd/promtool/unittest.go#L37)
     Want to check if your alertmanager routing works? Create unit test using native routing logic imported directly from github.com/prometheus/alertmananger
 
-* Keep the set of the languages used in your organization to a minimum - just one: Golang, which one of the cleanest and easiest to read languages made.
+* Keep the set of the languages used in your organization to a minimum - just one: Go, which one of the cleanest and easiest to read languages made.
 
 * Associate things. If you create a Kubernetes Deployment that expects configMap A, it's sometimes easy to make a typo or forget to apply that configMap A.
-  With Golang you can associate those two together either by common constant string, or by literally referencing `ConfigMap.Name` in your Kubernetes Deployment. 
+  With Go you can associate those two together either by common constant string, or by literally referencing `ConfigMap.Name` in your Kubernetes Deployment. 
   Catch the bugs early!
 
 ## What this project is NOT
@@ -156,9 +156,9 @@ tool that fits the job for this. `GoCodeIt` only helps you to define, test and g
 
 ## Important: Guide & best practices
 
-The TL;DR is that defining your information in Golang code IS different then writing robust code for an application logic.
+The TL;DR is that defining your information in Go code IS different then writing robust code for an application logic.
 This code serves a certain goals like command-line only based file generation, configuring and defining files that will be 
-consumed by other systems. This means that you need to switch context from other Golang code you might write for different purposes.
+consumed by other systems. This means that you need to switch context from other Go code you might write for different purposes.
 
 In details this means:
 
@@ -173,7 +173,7 @@ In details this means:
   
   **300 hundreds lines functions ARE acceptable here.**
 
-* Particularly do NOT try to circumvent the need to understand the upstream product. If you use Golang to
+* Particularly do NOT try to circumvent the need to understand the upstream product. If you use Go to
   configure a product, you need to understand how to use that product just as if you were
   configuring it directly.
     
@@ -183,7 +183,7 @@ In details this means:
   * Helps to reuse other templates/patterns from upstream in future
 
 * Where the overhead is not prohibitive, config structure and values should be written with an
-  appropriate Golang type. In particular, large string blobs and using strings to specify
+  appropriate Go type. In particular, large string blobs and using strings to specify
   non-string (e.g. integer, boolean) options should be avoided.
 
 * Associate and reference keys together. For example if you some Kubernetes deployment expects ConfigMap called "my-conf",
@@ -220,7 +220,7 @@ In details this means:
     parameter appropriately.
 
 
-* Try to NOT put secrets (tokens, private keys, etc.) in definition output (or anywhere else in your golang code!)
+* Try to NOT put secrets (tokens, private keys, etc.) in definition output (or anywhere else in your Go code!)
 
     I.e For kubernetes, put secrets via different mean as Kuberenetes Secrets. Alternatively define env variables and 
     use env vars substitution. For terraform, use the vault provider to have terraform pull secrets directly from vault.
@@ -244,7 +244,7 @@ In details this means:
 
 Please do! 
 
-First of all start defining your configuration, infra and deployment as Golang code! (: Share this concept, let's start to:
+First of all start defining your configuration, infra and deployment as Go code! (: Share this concept, let's start to:
 * Get rid of unreadable, untyped teamplating languages like jsonnet, m4 etc
 * Test your configuration; FINALLY!
 
@@ -263,7 +263,7 @@ Please use GitHub issues and our slack `#gocodeit` for feedback and questions. P
   * Not all project's config are prepared to be imported (config tied to implementation, huge deps, secret masked, no marshaling etc): 
   See: https://github.com/prometheus/alertmanager/pull/1804
   * While YAML schema should not change a lot (for stable APIs, 1+ semantic versions for projects), 
-  internal underlying Golang struct's code can change a lot. If this concept will be widely popular it will encourage project to:
+  internal underlying Go struct's code can change a lot. If this concept will be widely popular it will encourage project to:
     * either maintain your config structs as Kubernetes does (it is an API and well documented types)
     * define configuration file via [protobuf]() e.g like envoy [here](https://github.com/envoyproxy/envoy/tree/507191a36958bbeb1b11143fe0acb149f3f2fb00/api/envoy/config)
     
