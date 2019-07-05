@@ -1,4 +1,4 @@
-# Guide & best practices
+# Guide & Best Practices
 
 **TL:DR; defining configuration in Go code *is different* than writing robust production go code for an application.**
 
@@ -64,6 +64,8 @@ In details this means:
     to take a parameter for this behaviour and have the definition of staging and production set the
     parameter appropriately.
 
+* Avoid basing any output or configuration of your applications or infrastructure on your organisational structure ... this will 
+  and does change often so don't bake it into your configuration. 
 
 * **DO NOT** put secrets (tokens, private keys, etc.) in your config definition or output (or anywhere else in your code!)
 
