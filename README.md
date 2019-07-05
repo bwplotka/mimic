@@ -207,4 +207,4 @@ How:
 * [Cue](https://github.com/cuelang/cue)
 * mixins
 * jsonnet
-* duh blah blah (not OSS) // what is it called?
+* Pullumi (not OSS)
