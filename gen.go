@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Generator is a module that hep
+// Generator managed a pool of files that are generated and written from go code.
 type Generator struct {
 	FilePool
 
@@ -20,7 +20,7 @@ type Generator struct {
 	generated bool
 }
 
-// New returns new Generator that parses os.Args as command line arguments.
+// New returns a new Generator that parses os.Args as command line arguments.
 // It allows passing closure BEFORE parsing the flags to allow defining additional flags.
 //
 // NOTE: Read README.md before using. This is intentionally NOT following Golang library patterns like:
@@ -86,7 +86,24 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 // Example:
 //
 // ```
-//  gen := With("mycompany.com", "production", "eu1", "kubernetes" "thanos")
+//  gen := With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+// ```
+// Giving the path `mycompany.com/production/eu1/kubernetes/thanos`.
+//
+// With return a Generator pointing at the specified path which can be specified even further:
+// Example:
+// ```
+//   gen := New()
+//   // gcigen/
+//   ...
+//   gen = gen.With('foo')
+//   // gcigen/foo
+//   ...
+//   {
+//     gen = gen.With('bar')
+//     // gcigen/foo/bar
+//   }
+//   // gcigen/foo
 // ```
 func (g *Generator) With(parts ...string) *Generator {
 	// TODO(bwplotka): Support "..", to get back?
@@ -101,7 +118,7 @@ func (g *Generator) With(parts ...string) *Generator {
 	}
 }
 
-// Generate generates all the files that were registered before.
+// Generate generates the configuration files that have been defined and added to a generator.
 func (g *Generator) Generate() {
 	if g.generated {
 		PanicErr(errors.New("generate method already invoked once."))
@@ -112,7 +129,7 @@ func (g *Generator) Generate() {
 	g.write(g.out)
 }
 
-// UnmarshalSecretFile allows to easily manage your secrets passed to Golang defined configuration via custom file.
+// UnmarshalSecretFile allows to management of your secrets passed to Go defined configuration via custom file.
 func UnmarshalSecretFile(file string, in interface{}) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
