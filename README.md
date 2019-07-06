@@ -1,4 +1,4 @@
-# "Config as Go - Define your Configuration, Infrastructure and Containers as Go Code"
+# "Config as Go - Define your Configuration, Infrastructure and Deployments as Go Code"
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/gocodeit)](https://goreportcard.com/report/github.com/bwplotka/gocodeit) 
 [![GoDoc](https://godoc.org/github.com/bwplotka/gocodeit?status.svg)](https://godoc.org/github.com/bwplotka/gocodeit)
@@ -110,15 +110,15 @@ and patterns that we believe are valuable for everyone.
 
 ## But Why Go? 
 
-Why you should define your templates/infra/configs in Golang?
+Why you should define your templates/infra/configs in Go?
+
 
 * Configuration as code ... like actual code, not json, yaml or tf.
 
 * Go is a strongly **typed** language. This means that compiler and IDE of your choice will *massively* help you 
   find what config fields are allowed, what values enum expects and what is the type of each field.
   
-* Unit/Integration test your configuration, infrastructure and deployment. 
- 
+* Unit/Integration test your configuration, infrastructure and deployment.  
     For example: 
     * Test your PromQL queries in Prometheus alerts works as expected? Just write unit test for those using e.g [this](https://github.com/prometheus/prometheus/blob/f678e27eb62ecf56e2b0bad82345925a4d6162a2/cmd/promtool/unittest.go#L37)
     * Enforce conventions such as service naming conventions via tests.
@@ -207,4 +207,4 @@ How:
 * [Cue](https://github.com/cuelang/cue)
 * mixins
 * jsonnet
-* Pullumi (not OSS)
+* Pullumi (Paid)

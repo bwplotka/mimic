@@ -83,7 +83,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string, promVersion strin
 		httpSidecarPort = 19190
 		grpcSidecarPort = 19090
 		blockgenImage   = "improbable/blockgen:master-894c9481c4"
-		// Generate million series.
+		// Generate 10k series.
 		blockgenInput = `[{
   "type": "gauge",
   "jitter": 20,
