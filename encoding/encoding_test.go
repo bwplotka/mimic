@@ -9,15 +9,14 @@ import (
 	ghodssyaml "github.com/ghodss/yaml"
 )
 
-func TestYaml_Encoding2Structs(t *testing.T) {
+func TestYaml_EncodingToStructs(t *testing.T) {
 	type A struct {
 		Field1 string
 		Field2 int
 		Inner  *A
 	}
 
-	b, err := ioutil.ReadAll(yaml(
-		ghodssyaml.Marshal,
+	actual, err := ioutil.ReadAll(GhodssYAML(
 		A{
 			Field1: "1",
 			Field2: 1,
@@ -42,5 +41,5 @@ Inner:
 Field1: "2"
 Field2: 2
 Inner: null
-`, string(b))
+`, string(actual))
 }
