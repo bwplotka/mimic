@@ -14,7 +14,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-// FilePool is a struct for storing and managing files to be generated as part of an application run.
+// FilePool is a struct for storing and managing files to be generated as part of generation.
 type FilePool struct {
 	Logger log.Logger
 
@@ -23,9 +23,10 @@ type FilePool struct {
 	m map[string]string
 }
 
-// Add adds a file to files pool. File is identified by filename.
-// It allows passing content of the file as io.Reader.
+// Add adds a file to the file pool at the current path. The file is identified by filename.
+// Content of the file is passed via an io.Reader.
 //
+// If the file with the given name has already been added at this path the code will `panic`.
 // NOTE: See gocodeit/encoding for different marshallers to use as io.Reader.
 func (f *FilePool) Add(fileName string, r io.Reader) {
 	if filepath.Base(fileName) != fileName {
