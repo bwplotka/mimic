@@ -12,18 +12,18 @@ import (
 func main() {
 	gci := gocodeit.New()
 
-	// Make sure to Generate at the very end.
+	// Defer Generate to ensure we generate the output.
 	defer gci.Generate()
 
-	// Hook your definitions below.
-	// For example Kubernetes configuration!
+	// Hook in your config below.
+	// As an example Kubernetes configuration!
 	const name = "some-statefulset"
 
-	// Let's imagine we fill those...
+	// Create some containers ... (imagine for now).
 	var container1, container2, container3 corev1.Container
 	var volume1 corev1.Volume
 
-	// Example statefulset using native Kubernetes structs.
+	// Configure a statefulset using native Kubernetes structs.
 	set := appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
@@ -57,6 +57,6 @@ func main() {
 			},
 		},
 	}
-	// Generate file in config directory using chosen encoding.
+	// Now Add some-statefulset.yaml to the config folder.
 	gci.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
 }

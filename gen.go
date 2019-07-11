@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Generator managed a pool of files that are generated and defined in go code.
+// Generator manages a pool of files that are generated and defined in go code.
 type Generator struct {
 	FilePool
 

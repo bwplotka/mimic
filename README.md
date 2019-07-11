@@ -6,18 +6,18 @@
 `GoCodeIt` (`gci`): A Go module for defining and generating config in Go:
 
 * Define your Configuration (e.g Envoy, Prometheus, Alertmanager, Nginx, Prometheus Alerts, Rules, Grafana Dashaboards etc.)
-* Define your Infrastructure (e.g Terraform, Ansible, Puppet, Chef, etc)
-* Define your Container Management (e.g Docker compose, Kubernetes, etc)
+* Define your Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Kubernetes etc)
 * Define any other file that you can imagine
 
 ... using simple, typed and testable Go code!
 
 ## Getting Started
 
-1. Start new project, or add to an existing one
 1. Create a new go file for your config e.g `config/main.go`
-1. Import gocodeit using Golang 1.12+ via `import "github.com/bwplotka/gocodeit"`.
-1. Add configuration hooks in your `main` package using the `gocodeit` module. 
+1. Import gocodeit using Golang 1.12+ via `import "github.com/bwplotka/gocodeit"`
+1. Add configuration in your `main` package using the `gocodeit` module 
+1. Run `go run config/example.go generate`
+1. You will now see the generated Kubernetes YAML file here: `cat gcigen/config/some-statefulset.yaml`
 
 For [example](projects/example.go):
     
@@ -86,8 +86,6 @@ For [example](projects/example.go):
     }
 ```   
     
-1. Run `go run config/example.go generate`
-1. You will now see the generated Kubernetes YAML file here: `cat gcigen/config/some-statefulset.yaml`
  
 Now you are ready to start defining your own resources! 
 
@@ -98,15 +96,11 @@ Other examples can be found in [here](projects).
 `GoCodeIt` is a package that allows you to define your configuration using Go and generate this into configuration files 
 your application and tooling understands. 
 
-## Why Create `GoCodeIt`?
+## Why was`GoCodeIt` created?
 
-`GoCodeIt` has been built from our past experience using this concept to configure our applications and infratstructre 
-at Improbable.
+`GoCodeIt` has been built from our past experience using this concept to configure our applications and infratstructre.
 
-This project is an rebuild based on that initial idea from scratch in our spare time, with input from the wider community.
-
-It offers not only to show the concept and an implementation example but also to share what we have learned, best practice 
-and patterns that we believe are valuable for everyone. 
+It offers not only to show the concept and an implementation example but also to share what we have learned, best practice and patterns that we believe are valuable for everyone. 
 
 ## But Why Go? 
 
@@ -138,12 +132,11 @@ Giving you visibility in your config of exactly what your defining. See [this gr
 * Quick feedback loop. Catch most mistakes and incompatibilities in Golang compile time, before you even deploy it further. 
   As you probably know one of Golang goal is to have very fas compilation time, which feels like you are running a script.
 
-* Keep the set of the languages used in your organization to a minimum - just one: Go, one of the cleanest, simplest and 
-dev friendly languages at the moment.
+* Keep the set of the languages used in your organization to a minimum - just one: Go, one of the cleanest, simplest and developer friendly languages around.
 
 ## What `GoCodeIt` is **NOT**
 
-* It does NOT implementi any deployment/distribution logic. 
+* It does NOT implement any deployment/distribution logic. 
 * It is NOT intended to trigger any changes. Instead use the right tool for the job e.g. `kubectl apply`, `ansible`, `puppet`, `chef`, `terraform`
 * It is NOT (yet) a registry for reusable templates, however we encourage the community to create public repositories for those!
 
