@@ -3,6 +3,12 @@ package encoding
 import (
 	"bytes"
 	"io"
+
+	jsonggpb "github.com/gogo/protobuf/jsonpb"
+	protogg "github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 )
 
 // JSONPB returns reader that encodes protobuf messages to JSON.

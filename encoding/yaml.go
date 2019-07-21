@@ -3,7 +3,11 @@ package encoding
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+
+	yaml2 "gopkg.in/yaml.v2"
+	ghodssyaml "github.com/ghodss/yaml"
 )
 
 // GhodssYAML returns reader that encodes anything to YAML using github.com/ghodss/yaml.
@@ -38,7 +42,7 @@ func yaml(marshalFn MarshalFunc, in ...interface{}) io.Reader {
 		} else {
 			b, err := marshalFn(entry)
 			if err != nil {
-				return errReader{err: errors.Wrapf(err, "unable to marshal to YAML: %v", in)}
+				return errReader{err: errors.New(fmt.Sprintf("unable to marshal to YAML: %v", in))}
 			}
 			entryBytes = b
 		}

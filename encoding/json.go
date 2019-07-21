@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 // JSON returns reader that encodes anything to JSON.
