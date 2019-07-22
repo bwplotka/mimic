@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	ghodssyaml "github.com/ghodss/yaml"
 )
 
 func TestYaml_EncodingToStructs(t *testing.T) {

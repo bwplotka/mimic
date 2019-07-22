@@ -1,15 +1,16 @@
-package gocodeit
+package mimic
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
 
+	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/yaml.v2"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
-	"gopkg.in/alecthomas/kingpin.v2"
-	"gopkg.in/yaml.v2"
 )
 
 // Generator manages a pool of files that are generated and defined in go code.
@@ -28,11 +29,11 @@ type Generator struct {
 // * It creates CLI command inside constructor.
 // * It does not allow custom loggers etc
 func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
-	app := kingpin.New("gocodeit", "GoCodeIt: https://github.com/bwplotka/gocodeit")
+	app := kingpin.New("mimic", "mimic: https://github.com/bwplotka/mimic")
 	app.HelpFlag.Short('h')
 
 	gen := app.Command("generate", "generates output files from all registered files via Add method.")
-	out := gen.Flag("output", "output directory for generated files.").Short('o').Default("gcigen").String()
+	out := gen.Flag("output", "output directory for generated files.").Short('o').Default("gen").String()
 
 	for _, inj := range injs {
 		inj(gen)
@@ -93,16 +94,16 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 // Example:
 // ```
 //   gen := New()
-//   // gcigen/
+//   // gen/
 //   ...
 //   gen = gen.With('foo')
-//   // gcigen/foo
+//   // gen/foo
 //   ...
 //   {
 //     gen := gen.With('bar')
-//     // gcigen/foo/bar
+//     // gen/foo/bar
 //   }
-//   // gcigen/foo
+//   // gen/foo
 // ```
 func (g *Generator) With(parts ...string) *Generator {
 	// TODO(bwplotka): Support "..", to get back?

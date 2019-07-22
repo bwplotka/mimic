@@ -1,5 +1,5 @@
 /*
-encoding is a package of default encodings supplied with gocodeit.
+encoding is a package of default encodings supplied with mimic.
 
 Each of the encodings match the following func declaration:
 ```

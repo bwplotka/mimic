@@ -19,7 +19,7 @@ echo "Fetching 10k series StoreAPI.Series from sidecar via RR"
 echo "'min_time'=${MIN_T} ${MIN_TDIFF} 'max_time'=${MAX_T} ${MAX_TDIFF}"
 GOGOPROTO_ROOT="$(GO111MODULE=on go list -f '{{ .Dir }}' -m github.com/gogo/protobuf)"
 
-time /home/bartek/Repos/gocodeit/.bin/grpcurl \
+time /home/bartek/Repos/mimic/.bin/grpcurl \
 -plaintext -proto \
 ./rpc.proto -proto ./types.proto \
 -import-path . \

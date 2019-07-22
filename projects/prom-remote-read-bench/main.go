@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/prometheus/common/model"
 	"io/ioutil"
 	"path"
 
-	"github.com/bwplotka/gocodeit/abstractions/kubernetes/volumes"
+	"github.com/prometheus/common/model"
+
+	"github.com/bwplotka/mimic/abstractions/kubernetes/volumes"
 	"github.com/go-openapi/swag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,9 +16,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/bwplotka/gocodeit"
-	"github.com/bwplotka/gocodeit/encoding"
-	"github.com/bwplotka/gocodeit/providers/prometheus"
+	"github.com/bwplotka/mimic"
+	"github.com/bwplotka/mimic/encoding"
+	"github.com/bwplotka/mimic/providers/prometheus"
 )
 
 const (
@@ -29,10 +30,10 @@ const (
 Test procedure:
 
 * Generate YAMLs from definitions:
-  * `go run github.com/bwplotka/gocodeit/projects/prom-remote-read-bench generate`
+  * `go run github.com/bwplotka/mimic/projects/prom-remote-read-bench generate`
 
 * Apply baseline:
-  * `kubectl apply -f gcigen/prom-rr-test.yaml`
+  * `kubectl apply -f gen/prom-rr-test.yaml`
 
 * Forward gRPC sidecar port:
   * `kubectl port-forward pod/prom-rr-test-0 1234:19090`
@@ -45,16 +46,16 @@ requests as remote read to Prometheus
 */
 
 func main() {
-	gci := gocodeit.New()
+	generator := mimic.New()
 
 	// Make sure to generate at the very end.
-	defer gci.Generate()
+	defer generator.Generate()
 
 	// Generate resources for remote read tests.
 
 	// Baseline.
 	genRRTestPrometheus(
-		gci,
+		generator,
 		"prom-rr-test",
 		"v2.11.0-rc.0-clear",
 		"v0.5.0",
@@ -62,14 +63,14 @@ func main() {
 
 	// Streamed.
 	genRRTestPrometheus(
-		gci,
+		generator,
 		"prom-rr-test-streamed",
 		"v2.11.0-rc.0-rr-streaming",
 		"v0.5.0-rr-streamed2",
 	)
 }
 
-func genRRTestPrometheus(gci *gocodeit.Generator, name string, promVersion string, thanosVersion string) {
+func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion string, thanosVersion string) {
 	const (
 		replicas = 1
 
@@ -107,7 +108,7 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string, promVersion strin
 		},
 	}))
 	if err != nil {
-		gocodeit.PanicErr(err)
+		mimic.PanicErr(err)
 	}
 	promConfigAndMount := volumes.ConfigAndMount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -341,5 +342,5 @@ func genRRTestPrometheus(gci *gocodeit.Generator, name string, promVersion strin
 		},
 	}
 
-	gci.Add(name+".yaml", encoding.GhodssYAML(set, srv, promConfigAndMount.ConfigMap()))
+	generator.Add(name+".yaml", encoding.GhodssYAML(set, srv, promConfigAndMount.ConfigMap()))
 }
