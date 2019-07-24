@@ -13,6 +13,5 @@
 .idea/*
 .bin/*
 
-gcigen
 gen
 .envrc
