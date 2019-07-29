@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/bwplotka/gocodeit"
-	"github.com/bwplotka/gocodeit/encoding"
+	"github.com/bwplotka/mimic"
+	"github.com/bwplotka/mimic/encoding"
 	"github.com/go-openapi/swag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -10,10 +10,10 @@ import (
 )
 
 func main() {
-	gci := gocodeit.New()
+	generator := mimic.New()
 
 	// Defer Generate to ensure we generate the output.
-	defer gci.Generate()
+	defer generator.Generate()
 
 	// Hook in your config below.
 	// As an example Kubernetes configuration!
@@ -58,5 +58,5 @@ func main() {
 		},
 	}
 	// Now Add some-statefulset.yaml to the config folder.
-	gci.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
+	generator.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
 }

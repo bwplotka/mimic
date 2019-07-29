@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/bwplotka/gocodeit"
+	"github.com/bwplotka/mimic"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +74,7 @@ func (m ConfigAndMount) VolumeAndMount() VolumeAndMount {
 func (m ConfigAndMount) HashEnv(name string) corev1.EnvVar {
 	h := sha256.New()
 	if err := json.NewEncoder(h).Encode(m.Data); err != nil {
-		gocodeit.Panicf("failed to JSON encode & hash configMap data for %s, err: %v", m.VolumeMount.Name, err)
+		mimic.Panicf("failed to JSON encode & hash configMap data for %s, err: %v", m.VolumeMount.Name, err)
 	}
 
 	return corev1.EnvVar{

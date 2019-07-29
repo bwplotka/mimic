@@ -1,4 +1,4 @@
-package gocodeit
+package mimic
 
 import (
 	"io"
@@ -27,7 +27,7 @@ type FilePool struct {
 // Content of the file is passed via an io.Reader.
 //
 // If the file with the given name has already been added at this path the code will `panic`.
-// NOTE: See gocodeit/encoding for different marshallers to use as io.Reader.
+// NOTE: See mimic/encoding for different marshallers to use as io.Reader.
 func (f *FilePool) Add(fileName string, r io.Reader) {
 	if filepath.Base(fileName) != fileName {
 		Panicf("")

@@ -16,11 +16,11 @@ echo "Deploying infra-my-mon from `git rev-parse HEAD` via docker swarm (stack).
 mkdir -p "/docker-volumes/prometheus-data"
 mkdir -p "/docker-volumes/prometheus-config"
 
-rm -rf gcigen
+rm -rf gen
 # Generate yamls.
-go run github.com/bwplotka/gocodeit/examples/infra-my-mon generate --secret-file=secrets.yaml
+go run github.com/bwplotka/mimic/examples/infra-my-mon generate --secret-file=secrets.yaml
 
-GEN="gcigen/production/prod-par1-mon0"
+GEN="gen/production/prod-par1-mon0"
 
 cp ${GEN}/deploy/configs/prometheus.yaml /docker-volumes/prometheus-config
 

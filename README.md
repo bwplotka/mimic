@@ -1,9 +1,9 @@
-# "Config as Go - Define your Configuration, Infrastructure and Deployments as Go Code"
+# Mimic - Define your Configuration, Infrastructure and Deployments as Go Code
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/gocodeit)](https://goreportcard.com/report/github.com/bwplotka/gocodeit) 
-[![GoDoc](https://godoc.org/github.com/bwplotka/gocodeit?status.svg)](https://godoc.org/github.com/bwplotka/gocodeit)
+[![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mimic)](https://goreportcard.com/report/github.com/bwplotka/mimic) 
+[![GoDoc](https://godoc.org/github.com/bwplotka/mimic?status.svg)](https://godoc.org/github.com/bwplotka/mimic)
 
-`GoCodeIt` (`gci`): A Go module for defining and generating config in Go:
+`mimic`: A Go module for defining and generating config in Go:
 
 * Define your Configuration (e.g Envoy, Prometheus, Alertmanager, Nginx, Prometheus Alerts, Rules, Grafana Dashaboards etc.)
 * Define your Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Kubernetes etc)
@@ -14,10 +14,10 @@
 ## Getting Started
 
 1. Create a new go file for your config e.g `config/main.go`
-1. Import gocodeit using Golang 1.12+ via `import "github.com/bwplotka/gocodeit"`
-1. Add configuration in your `main` package using the `gocodeit` module 
+1. Import mimic using Golang 1.12+ via `import "github.com/bwplotka/mimic"`
+1. Add configuration in your `main` package using the `mimic` module 
 1. Run `go run config/example.go generate`
-1. You will now see the generated Kubernetes YAML file here: `cat gcigen/config/some-statefulset.yaml`
+1. You will now see the generated Kubernetes YAML file here: `cat gen/config/some-statefulset.yaml`
 
 For [example](projects/example.go):
     
@@ -25,8 +25,8 @@ For [example](projects/example.go):
     package main
     
     import (
-    	"github.com/bwplotka/gocodeit"
-    	"github.com/bwplotka/gocodeit/encoding"
+    	"github.com/bwplotka/mimic"
+    	"github.com/bwplotka/mimic/encoding"
     	"github.com/go-openapi/swag"
     	appsv1 "k8s.io/api/apps/v1"
     	corev1 "k8s.io/api/core/v1"
@@ -34,10 +34,10 @@ For [example](projects/example.go):
     )
     
     func main() {
-    	gci := gocodeit.New()
+    	generator := mimic.New()
     
     	// Defer Generate to ensure we generate the output.
-    	defer gci.Generate()
+    	defer generator.Generate()
     
     	// Hook in your config below.
     	// As an example Kubernetes configuration!
@@ -82,7 +82,7 @@ For [example](projects/example.go):
     		},
     	}
     	// Now Add some-statefulset.yaml to the config folder.
-    	gci.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
+    	generator.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
     }
 ```   
     
@@ -91,14 +91,14 @@ Now you are ready to start defining your own resources!
 
 Other examples can be found in [here](projects).
 
-## What is `GoCodeIt`?
+## What is `mimic`?
 
-`GoCodeIt` is a package that allows you to define your configuration using Go and generate this into configuration files 
+`mimic` is a package that allows you to define your configuration using Go and generate this into configuration files 
 your application and tooling understands. 
 
-## Why was`GoCodeIt` created?
+## Why was `mimic` created?
 
-`GoCodeIt` has been built from our past experience using this concept to configure our applications and infratstructre.
+`mimic` has been built from our past experience using this concept to configure our applications and infrastructure.
 
 It offers not only to show the concept and an implementation example but also to share what we have learned, best practice and patterns that we believe are valuable for everyone. 
 
@@ -134,13 +134,13 @@ Giving you visibility in your config of exactly what your defining. See [this gr
 
 * Keep the set of the languages used in your organization to a minimum - just one: Go, one of the cleanest, simplest and developer friendly languages around.
 
-## What `GoCodeIt` is **NOT**
+## What `mimic` is **NOT**
 
 * It does NOT implement any deployment/distribution logic. 
 * It is NOT intended to trigger any changes. Instead use the right tool for the job e.g. `kubectl apply`, `ansible`, `puppet`, `chef`, `terraform`
 * It is NOT (yet) a registry for reusable templates, however we encourage the community to create public repositories for those!
 
-## What does `GoCodeIt` include?
+## What does `mimic` include?
 
 * [x] [providers](providers) go structs representing configuration for applications, infrastructure and container management.
   * Included are a set of go providers that do not have native structs OR are not easily importable (yet).
@@ -164,7 +164,7 @@ Share with the community:
 * Share the Go unit/integration/acceptance tests against certain providers's definitions.
 * Share best practices and your experience!
 
-Please use GitHub issues and our slack `#gocodeit` for feedback and questions. 
+Please use GitHub issues and our slack `#mimic` for feedback and questions. 
 
 As always pull requests are VERY welcome as well!
 

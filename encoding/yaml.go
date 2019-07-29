@@ -2,8 +2,12 @@ package encoding
 
 import (
 	"bytes"
-	"errors"
+
 	"io"
+
+	ghodssyaml "github.com/ghodss/yaml"
+	"github.com/pkg/errors"
+	yaml2 "gopkg.in/yaml.v2"
 )
 
 // GhodssYAML returns reader that encodes anything to YAML using github.com/ghodss/yaml.
@@ -51,4 +55,3 @@ func yaml(marshalFn MarshalFunc, in ...interface{}) io.Reader {
 
 	return bytes.NewBuffer(bytes.Join(res, concatDelim))
 }
-

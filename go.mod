@@ -1,22 +1,22 @@
-module github.com/bwplotka/gocodeit
+module github.com/bwplotka/mimic
+
+go 1.12
 
 require (
-	github.com/ghodss/yaml v1.0.0
-	github.com/go-kit/kit v0.8.0
-	github.com/go-logfmt/logfmt v0.4.0 // indirect
-	github.com/go-openapi/swag v0.19.0
-	github.com/gogo/protobuf v1.2.1
-	github.com/golang/protobuf v1.3.1
-	github.com/kr/pretty v0.1.0 // indirect
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
+	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 // indirect
+	github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680
+	github.com/go-kit/kit v0.9.0
+	github.com/go-openapi/swag v0.19.4
+	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/gogo/protobuf v1.1.1
+	github.com/golang/protobuf v1.3.2
 	github.com/pkg/errors v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829 // indirect
-	github.com/prometheus/common v0.2.0
+	github.com/prometheus/common v0.6.0
 	github.com/stretchr/testify v1.3.0
-	golang.org/x/net v0.0.0-20190311183353-d8887717615a // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v2 v2.2.2
-	k8s.io/api v0.0.0-20190515023547-db5a9d1c40eb
-	k8s.io/apimachinery v0.0.0-20190515023456-b74e4c97951f
+	k8s.io/api v0.0.0-20190722141453-b90922c02518
+	k8s.io/apimachinery v0.0.0-20190719140911-bfcf53abc9f8
 )

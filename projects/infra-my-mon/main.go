@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bwplotka/gocodeit"
-	"github.com/bwplotka/gocodeit/encoding"
-	"github.com/bwplotka/gocodeit/providers/dockercompose"
-	"github.com/bwplotka/gocodeit/providers/prometheus"
-	sdconfig "github.com/bwplotka/gocodeit/providers/prometheus/discovery/config"
-	"github.com/bwplotka/gocodeit/providers/prometheus/discovery/dns"
-	"github.com/bwplotka/gocodeit/providers/prometheus/discovery/targetgroup"
+	"github.com/bwplotka/mimic"
+	"github.com/bwplotka/mimic/encoding"
+	"github.com/bwplotka/mimic/providers/dockercompose"
+	"github.com/bwplotka/mimic/providers/prometheus"
+	sdconfig "github.com/bwplotka/mimic/providers/prometheus/discovery/config"
+	"github.com/bwplotka/mimic/providers/prometheus/discovery/dns"
+	"github.com/bwplotka/mimic/providers/prometheus/discovery/targetgroup"
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -23,42 +23,42 @@ type Secrets struct {
 
 func main() {
 	var secretFile *string
-	gci := gocodeit.New(
+	generator := mimic.New(
 		func(cmd *kingpin.CmdClause) {
 			secretFile = cmd.Flag("secret-file", "YAML file with secrets").Required().String()
 		},
 	)
 
 	// Make sure to generate at the very end.
-	defer gci.Generate()
+	defer generator.Generate()
 
 	var secrets Secrets
-	gocodeit.UnmarshalSecretFile(*secretFile, &secrets)
+	mimic.UnmarshalSecretFile(*secretFile, &secrets)
 
 	// Start generating stuff.
-	genMyMonAll(gci, secrets)
+	genMyMonAll(generator, secrets)
 }
 
-func genMyMonAll(gci *gocodeit.Generator, secrets Secrets) {
+func genMyMonAll(generator *mimic.Generator, secrets Secrets) {
 	for _, env := range Environments {
-		gci := gci.With(env.Name)
+		generator := generator.With(env.Name)
 		for _, cl := range ClustersByEnv[env] {
-			gci := gci.With(cl.Name)
+			generator := generator.With(cl.Name)
 
-			genMyMonDockerCompose(gci.With("deploy"), cl, secrets)
+			genMyMonDockerCompose(generator.With("deploy"), cl, secrets)
 		}
 	}
 }
 
 func genMyMonPrometheusConfig(
-	gci *gocodeit.Generator,
+	generator *mimic.Generator,
 	cl *Cluster,
 	nodeExporterPort int,
 	prometheusPort int,
 	dockerdPort int,
 	secrets Secrets,
 ) {
-	cfg := prometheus.Config{
+	promConfig := prometheus.Config{
 		GlobalConfig: prometheus.GlobalConfig{
 			ScrapeInterval: model.Duration(15 * time.Second),
 			ScrapeTimeout:  model.Duration(15 * time.Second),
@@ -109,10 +109,10 @@ func genMyMonPrometheusConfig(
 			},
 		},
 	}
-	gci.Add("prometheus.yaml", encoding.YAML(cfg))
+	generator.Add("prometheus.yaml", encoding.YAML(promConfig))
 }
 
-func genMyMonDockerCompose(gci *gocodeit.Generator, cl *Cluster, secrets Secrets) {
+func genMyMonDockerCompose(generator *mimic.Generator, cl *Cluster, secrets Secrets) {
 	const (
 		prometheusDataVolume       = "prometheus-data"
 		prometheusDockerVolumePath = "/docker-volumes/prometheus-data"
@@ -132,7 +132,7 @@ func genMyMonDockerCompose(gci *gocodeit.Generator, cl *Cluster, secrets Secrets
 	)
 	//Top-level object must be a mapping
 
-	genMyMonPrometheusConfig(gci.With("configs"), cl, promPort, nodeExpPort, dockerdPort, secrets)
+	genMyMonPrometheusConfig(generator.With("configs"), cl, promPort, nodeExpPort, dockerdPort, secrets)
 
 	// TODO(bwplotka): Add envoy, alertmanager, make sure docker is monitored as well etc.
 	dpl := dockercompose.Config{
@@ -247,5 +247,5 @@ func genMyMonDockerCompose(gci *gocodeit.Generator, cl *Cluster, secrets Secrets
 		},
 	}
 
-	gci.Add("mon-compose.yaml", encoding.YAML(dpl))
+	generator.Add("mon-compose.yaml", encoding.YAML(dpl))
 }
