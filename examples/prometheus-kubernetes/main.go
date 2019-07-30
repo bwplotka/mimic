@@ -7,6 +7,7 @@ import (
 	rbacv1beta1"k8s.io/api/rbac/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -173,6 +174,68 @@ func main() {
 	}
 
 	generator.Add("alertmanager-deployment.yaml", encoding.YAML(alertManagerDeployment))
+	
+	alertManagerPvc := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "release-name-prometheus-alertmanager",
+			Labels: map[string]string{
+				"app": "prometheus",
+				"component": "alertmanager",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("2Gi"),
+				},
+			},
+		},
+	}
+
+	generator.Add("alertmanager-pvc.yaml", encoding.YAML(alertManagerPvc))
+	
+	alertManagerService := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "release-name-prometheus-alertmanager",
+			Labels: map[string]string{
+				"app": "prometheus",
+				"component": "alertmanager",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "http",
+					Port: 80,
+					Protocol: "TCP",
+					TargetPort: intstr.FromInt(alertManagerPort),
+				},
+			},
+			Selector: map[string]string{
+				"app": "prometheus",
+				"component": "alertmanager",
+			},
+			Type: corev1.ServiceTypeClusterIP,
+		},
+	}
+
+	generator.Add("alertmanager-service.yaml", encoding.YAML(alertManagerService))
+	
+	alertManagerServiceAccount := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "release-name-prometheus-alertmanager",
+			Labels: map[string]string{
+				"app": "prometheus",
+				"component": "alertmanager",
+			},
+		},
+	}
+
+	generator.Add("alertmanager-serviceaccount.yaml", encoding.YAML(alertManagerServiceAccount))
+	
 	
 	// Kube-state-metrics
 	
