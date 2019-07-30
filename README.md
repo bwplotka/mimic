@@ -9,7 +9,9 @@
 * Define your Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Kubernetes etc)
 * Define any other file that you can imagine
 
-... using simple, typed and testable Go code!
+...using simple, typed and testable Go code!
+
+_`mimic`: Mimic is a super-human with the ability to copy the powers and abilities of others._
 
 ## Getting Started
 
@@ -19,7 +21,7 @@
 1. Run `go run config/example.go generate`
 1. You will now see the generated Kubernetes YAML file here: `cat gen/config/some-statefulset.yaml`
 
-For [example](projects/example.go):
+For [example](examples/kubernetes-statefulset/example.go):
     
  ```go
     package main

@@ -45,8 +45,8 @@ func (vams VolumesAndMounts) VolumeMounts() []corev1.VolumeMount {
 
 type ConfigAndMount struct {
 	metav1.ObjectMeta
-	corev1.VolumeMount
-	Data map[string]string
+	corev1.VolumeMount //nolint:govet
+	Data               map[string]string
 }
 
 func (m ConfigAndMount) ConfigMap() corev1.ConfigMap {

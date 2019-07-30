@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -44,15 +43,6 @@ func (f *FilePool) Add(fileName string, r io.Reader) {
 		Panicf("filename clash: %s", output)
 	}
 	f.m[output] = string(b)
-}
-
-func (f *FilePool) sortedPaths() []string {
-	var paths []string
-	for k := range f.m {
-		paths = append(paths, k)
-	}
-	sort.Strings(paths)
-	return paths
 }
 
 func (f *FilePool) write(outputDir string) {

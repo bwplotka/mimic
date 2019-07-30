@@ -39,14 +39,6 @@ type GlobalConfig struct {
 	ExternalLabels model.LabelSet `yaml:"external_labels,omitempty"`
 }
 
-// isZero returns true iff the global config is the zero value.
-func (c *GlobalConfig) isZero() bool {
-	return c.ExternalLabels == nil &&
-		c.ScrapeInterval == 0 &&
-		c.ScrapeTimeout == 0 &&
-		c.EvaluationInterval == 0
-}
-
 // ScrapeConfig configures a scraping unit for Prometheus.
 type ScrapeConfig struct {
 	// The job name to which the job label is set by default.
