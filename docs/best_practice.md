@@ -3,7 +3,7 @@
 **TL:DR; defining configuration in Go code *is different* than writing robust production go code for an application.**
 
 This code serves a certain goals like command-line only based file generation, configuring and defining files that will be 
-consumed by other systems. This means that you need to switch context from other Golang code you might write for different purposes.
+consumed by other systems. This means that you need to switch context from other Go code you might write for different purposes.
 
 In details this means:
 
@@ -69,7 +69,7 @@ In details this means:
 
 * **DO NOT** put secrets (tokens, private keys, etc.) in your config definition or output (or anywhere else in your code!)
 
-    i.e For kubernetes you could put secrets in via Kuberenetes Secrets. Alternatively define env variables and 
+    i.e For kubernetes you could put secrets in via Kubernetes Secrets. Alternatively define env variables and 
     use env vars substitution.
     
     Ultimately use the best tools for this! See [vault](https://www.vaultproject.io/)

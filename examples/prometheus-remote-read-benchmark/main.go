@@ -78,7 +78,7 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 		configVolumeMount = "/etc/prometheus"
 		sharedDataPath    = "/data-shared"
 
-		namespace = "bartek"
+		namespace = "rr-test"
 
 		httpPort        = 9090
 		httpSidecarPort = 19190

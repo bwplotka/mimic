@@ -2,18 +2,15 @@ package mimic
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-
-	"gopkg.in/alecthomas/kingpin.v2"
-	"gopkg.in/yaml.v2"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-// Generator manages a pool of files that are generated and defined in go code.
+// Generator manages a pool of generated files.
 type Generator struct {
 	FilePool
 
@@ -44,7 +41,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 
 	cmd, err := app.Parse(os.Args[1:])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrapf(err, "Error parsing commandline arguments"))
+		_, _ = fmt.Fprintln(os.Stderr, errors.Wrapf(err, "Error parsing commandline arguments"))
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
@@ -86,14 +83,14 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 // Example:
 //
 // ```
-//  gen := With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+//  gen := gen.With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
 // ```
 // Giving the path `mycompany.com/production/eu1/kubernetes/thanos`.
 //
 // With return a Generator pointing at the specified path which can be specified even further:
 // Example:
 // ```
-//   gen := New()
+//   gen := mimic.New()
 //   // gen/
 //   ...
 //   gen = gen.With('foo')
@@ -127,16 +124,4 @@ func (g *Generator) Generate() {
 
 	_ = level.Info(g.Logger).Log("msg", "generated output", "dir", g.out)
 	g.write(g.out)
-}
-
-// UnmarshalSecretFile allows to management of your secrets passed to Go defined configuration via custom file.
-func UnmarshalSecretFile(file string, in interface{}) {
-	b, err := ioutil.ReadFile(file)
-	if err != nil {
-		Panicf("read file from: %v", err)
-	}
-
-	if err := yaml.Unmarshal(b, in); err != nil {
-		Panicf("failed to unmarshal file from: %v", err)
-	}
 }

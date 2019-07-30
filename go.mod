@@ -12,7 +12,6 @@ require (
 	github.com/gogo/protobuf v1.1.1
 	github.com/golang/protobuf v1.3.2
 	github.com/pkg/errors v0.8.1
-	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/common v0.6.0
 	github.com/stretchr/testify v1.3.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6

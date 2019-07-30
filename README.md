@@ -13,8 +13,8 @@
 
 ## Getting Started
 
-1. Create a new go file for your config e.g `config/main.go`
-1. Import mimic using Golang 1.12+ via `import "github.com/bwplotka/mimic"`
+1. Create a new go file for your config e.g `config/example.go`
+1. Import mimic using Go 1.12+ via `import "github.com/bwplotka/mimic"`
 1. Add configuration in your `main` package using the `mimic` module 
 1. Run `go run config/example.go generate`
 1. You will now see the generated Kubernetes YAML file here: `cat gen/config/some-statefulset.yaml`
@@ -89,7 +89,7 @@ For [example](projects/example.go):
  
 Now you are ready to start defining your own resources! 
 
-Other examples can be found in [here](projects).
+Other examples can be found in [here](examples).
 
 ## What is `mimic`?
 
@@ -129,8 +129,8 @@ for the project version you are running.
 you can leverage native comments for each struct's fields to document behaviour or details related to the config field. 
 Giving you visibility in your config of exactly what your defining. See [this great Kubernetes struct](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go#L55) as an example.
   
-* Quick feedback loop. Catch most mistakes and incompatibilities in Golang compile time, before you even deploy it further. 
-  As you probably know one of Golang goal is to have very fas compilation time, which feels like you are running a script.
+* Quick feedback loop. Catch most mistakes and incompatibilities in Go compile time, before you even deploy it further. 
+  As you probably know one of Go goal is to have very fas compilation time, which feels like you are running a script.
 
 * Keep the set of the languages used in your organization to a minimum - just one: Go, one of the cleanest, simplest and developer friendly languages around.
 
@@ -148,8 +148,7 @@ Giving you visibility in your config of exactly what your defining. See [this gr
   * Included are json, yaml and jsonpb.
 * [x] [abstractions](abstractions) a way to abstract concepts to a higher level if really needed (see best practice). 
 * [x] Examples:
-    * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](projects/prom-remote-read-bench)
-    * [(in progress) monioring for website using Dockercompose, Prometheus and Thanos](projects/infra-my-mon)
+    * [Infra definitions for Prometheus remote read benchmarks on Kubernetes](examples/prometheus-remote-read-benchmark)
     * You want to add your own example here? Write to us on Slack or file GH issue!
 
 ## Want to help us and Contribute?
@@ -160,7 +159,7 @@ First start defining your configuration, infra and deployment as Go code!
 
 Share with the community:
 * Share the Go templates you create. 
-* Share the Go configuration structs for non-Golang projects. 
+* Share the Go configuration structs for non-Go projects. 
 * Share the Go unit/integration/acceptance tests against certain providers's definitions.
 * Share best practices and your experience!
 
