@@ -11,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/pkg/errors"
-	"github.com/pmezard/go-difflib/difflib"
 )
 
 // FilePool is a struct for storing and managing files to be generated as part of generation.
@@ -63,46 +62,11 @@ func (f *FilePool) write(outputDir string) {
 			PanicErr(errors.Wrapf(err, "create directory %s", filepath.Dir(out)))
 		}
 
-		// TODO(bwplotka): Diff the things if something is already here.
+		// TODO(https://github.com/bwplotka/mimic/issues/11): Diff the things if something is already here and remove.
 
 		_ = level.Debug(f.Logger).Log("msg", "writing file", "file", out)
 		if err := ioutil.WriteFile(out, []byte(contents), 0755); err != nil {
 			PanicErr(errors.Wrapf(err, "write file to %s", out))
 		}
 	}
-}
-
-func (f *FilePool) diff(f2 *FilePool) string {
-	var out string
-
-	for _, p := range f.sortedPaths() {
-		if f.m[p] != f2.m[p] {
-			o, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(f.m[p]),
-				B:        difflib.SplitLines(f2.m[p]),
-				FromFile: p,
-				ToFile:   p,
-				Context:  3,
-			})
-			if err != nil {
-				PanicErr(errors.Wrap(err, "diffing via difflib"))
-			}
-			out += o
-		}
-	}
-	for _, p := range f2.sortedPaths() {
-		if _, ok := f.m[p]; !ok {
-			o, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(f2.m[p]),
-				B:        []string{},
-				FromFile: p,
-				ToFile:   p,
-			})
-			if err != nil {
-				PanicErr(errors.Wrap(err, "diffing via difflib"))
-			}
-			out += o
-		}
-	}
-	return out
 }
