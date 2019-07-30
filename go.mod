@@ -11,8 +11,10 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gogo/protobuf v1.1.1
 	github.com/golang/protobuf v1.3.2
+	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.6.0
+	github.com/rodaine/hclencoder v0.0.0-20190213202847-fb9757bb536e
 	github.com/stretchr/testify v1.3.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v2 v2.2.2
