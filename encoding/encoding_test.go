@@ -41,3 +41,28 @@ Field2: 2
 Inner: null
 `, string(actual))
 }
+
+func TestHCL_EncodingToStructs(t *testing.T) {
+	type Inner struct {
+		Key    string `hcl:",key"`
+		Field1 string `hcl:"field1"`
+		Field2 int    `hcl:"field2"`
+	}
+
+	actual, err := ioutil.ReadAll(HCL(
+		struct {
+			Inner `hcl:"inner"`
+		}{Inner{
+			Key:    "test",
+			Field1: "first",
+			Field2: 12,
+		},
+		},
+	))
+	require.NoError(t, err)
+	require.Equal(t, `inner "test" {
+  field1 = "first"
+  field2 = 12
+}
+`, string(actual))
+}
