@@ -1,25 +1,29 @@
 package main
 
 import (
+	"bytes"
 	"github.com/bwplotka/mimic"
 	"github.com/bwplotka/mimic/encoding"
+	"github.com/bwplotka/mimic/providers/prometheus"
+	sdconfig "github.com/bwplotka/mimic/providers/prometheus/discovery/config"
+	"github.com/bwplotka/mimic/providers/prometheus/discovery/kubernetes"
+	amConfig "github.com/prometheus/alertmanager/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	rbacv1beta1"k8s.io/api/rbac/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	amConfig "github.com/prometheus/alertmanager/config"
-	
+	"net/url"
 )
 
 const (
 	namespace = "default"
 	alertManagerPort = 9093
 	// This constant is not seemingly available in any of the k8s libraries
-	imagePullPolicyIfNotPresent = imagePullPolicyIfNotPresent
+	imagePullPolicyIfNotPresent = "IfNotPresent"
 )
 
 func main() {
@@ -636,6 +640,381 @@ func main() {
 	
 	// Server
 
+	serverConfig := prometheus.Config{
+		RuleFiles: []string{
+			"/etc/config/rules",
+			"/etc/config/alerts",
+		},
+		ScrapeConfigs: []*prometheus.ScrapeConfig{
+			{
+				JobName: "kubernetes-apiservers",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleEndpoint,
+						},
+					},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelKeep,
+						Regex: prometheus.MustNewRegexp("default;kubernetes;https"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_namespace",
+							"__meta_kubernetes_service_name",
+							"__meta_kubernetes_endpoint_port_name",
+						},
+					},
+				},
+				Scheme: "https",
+				HTTPClientConfig: config.HTTPClientConfig{
+					TLSConfig: config.TLSConfig{
+						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+						InsecureSkipVerify: true,
+					},
+					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+				},
+			},
+			{
+				JobName: "kubernetes-nodes",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleNode,
+						},
+					},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelLabelMap,
+						Regex: prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
+					},
+					{
+						Replacement: "kubernetes.default.svc:443",
+						TargetLabel: "__address__",
+					},
+					{
+						Regex: prometheus.MustNewRegexp("(.+)"),
+						Replacement: "/api/v1/nodes/${1}/proxy/metrics",
+						TargetLabel: "__metrics_path__",
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_node_name",
+						},
+					},
+				},
+				Scheme: "https",
+				HTTPClientConfig: config.HTTPClientConfig{
+					TLSConfig: config.TLSConfig{
+						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+						InsecureSkipVerify: true,
+					},
+					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+				},
+			},
+			{
+				JobName: "kubernetes-nodes-cadvisor",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleNode,
+						},
+					},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelLabelMap,
+						Regex: prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
+					},
+					{
+						Replacement: "kubernetes.default.svc:443",
+						TargetLabel: "__address__",
+					},
+					{
+						Regex: prometheus.MustNewRegexp("(.+)"),
+						Replacement: "/api/v1/nodes/${1}/proxy/metrics/cadvisor",
+						TargetLabel: "__metrics_path__",
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_node_name",
+						},
+					},
+				},
+				Scheme: "https",
+				HTTPClientConfig: config.HTTPClientConfig{
+					TLSConfig: config.TLSConfig{
+						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+						InsecureSkipVerify: true,
+					},
+					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+				},
+			},
+			{
+				JobName: "kubernetes-service-endpoints",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleEndpoint,
+						},
+					},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelKeep,
+						Regex: prometheus.MustNewRegexp("true"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_scrape",
+						},
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						Regex: prometheus.MustNewRegexp("(https?)"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_scheme",
+						},
+						TargetLabel: "__scheme__",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						Regex: prometheus.MustNewRegexp("(.+)"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_path",
+						},
+						TargetLabel: "__metrics_path__",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						Regex: prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
+						Replacement: "$1:$2",
+						SourceLabels: model.LabelNames{
+							"__address__",
+							"__meta_kubernetes_service_annotation_prometheus_io_port",
+						},
+						TargetLabel: "__address__",
+					},
+					{
+						Action: prometheus.RelabelLabelMap,
+						Regex: prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_namespace",
+						},
+						TargetLabel: "kubernetes_namespace",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_name",
+						},
+						TargetLabel: "kubernetes_name",
+					},
+				},
+			},
+			{
+				JobName: "prometheus-pushgateway",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleService,
+						},
+					},
+				},
+				HonorLabels:true,
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelKeep,
+						Regex:  prometheus.MustNewRegexp("pushgateway"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_probe",
+						},
+					},
+				},
+			},
+			{
+				JobName: "kubernetes-services",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RoleService,
+						},
+					},
+				},
+				MetricsPath: "/probe",
+				Params: url.Values{
+					"module": []string{"http_2xx"},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelKeep,
+						Regex: prometheus.MustNewRegexp("true"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_probe",
+						},
+					},
+					{
+						SourceLabels: model.LabelNames{
+							"__address__",
+						},
+						TargetLabel: "__param_target",
+					},
+					{
+						Replacement: "blackbox",
+						TargetLabel: "__address__",
+					},
+					{
+						SourceLabels: model.LabelNames{
+							"__param_target",
+						},
+						TargetLabel: "instance",
+					},
+					{
+						Action: prometheus.RelabelLabelMap,
+						Regex: prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_namespace",
+						},
+						TargetLabel: "kubernetes_namespace",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_name",
+						},
+						TargetLabel: "kubernetes_name",
+					},
+				},
+			},
+			{
+				JobName: "kubernetes-pods",
+				ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+					KubernetesSDConfigs: []*kubernetes.SDConfig{
+						{
+							Role: kubernetes.RolePod,
+						},
+					},
+				},
+				RelabelConfigs: []*prometheus.RelabelConfig{
+					{
+						Action: prometheus.RelabelKeep,
+						Regex: prometheus.MustNewRegexp("true"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_service_annotation_prometheus_io_scrape",
+						},
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						Regex: prometheus.MustNewRegexp("(.+)"),
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_pod_annotation_prometheus_io_path",
+						},
+						TargetLabel: "__metrics_path__",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						Regex: prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
+						Replacement: "$1:$2",
+						SourceLabels: model.LabelNames{
+							"__address__",
+							"__meta_kubernetes_service_annotation_prometheus_io_port",
+						},
+						TargetLabel: "__address__",
+					},
+					{
+						Action: prometheus.RelabelLabelMap,
+						Regex: prometheus.MustNewRegexp("__meta_kubernetes_pod_label_(.+)"),
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_namespace",
+						},
+						TargetLabel: "kubernetes_namespace",
+					},
+					{
+						Action: prometheus.RelabelReplace,
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_pod_name",
+						},
+						TargetLabel: "kubernetes_pod_name",
+					},
+				},
+			},
+		},
+		AlertingConfig:prometheus.AlertingConfig{
+			AlertmanagerConfigs: []*prometheus.AlertmanagerConfig{
+				{
+					ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
+						KubernetesSDConfigs: []*kubernetes.SDConfig{
+							{
+								Role: kubernetes.RolePod,
+							},
+						},
+					},
+					HTTPClientConfig: config.HTTPClientConfig{
+						TLSConfig: config.TLSConfig{
+							CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+							InsecureSkipVerify: true,
+						},
+						BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					},
+					RelabelConfigs: []*prometheus.RelabelConfig{
+						{
+							Action: prometheus.RelabelKeep,
+							SourceLabels: model.LabelNames{
+								"__meta_kubernetes_namespace",
+							},
+							Regex: prometheus.MustNewRegexp("default"),
+						},
+						{
+							Action: prometheus.RelabelKeep,
+							SourceLabels: model.LabelNames{
+								"__meta_kubernetes_pod_label_app",
+							},
+							Regex: prometheus.MustNewRegexp("prometheus"),
+						},
+						{
+							Action: prometheus.RelabelKeep,
+							SourceLabels: model.LabelNames{
+								"__meta_kubernetes_pod_label_component",
+							},
+							Regex: prometheus.MustNewRegexp("alertmanager"),
+						},
+						{
+							Action: prometheus.RelabelDrop,
+							SourceLabels: model.LabelNames{
+								"__meta_kubernetes_pod_container_port_number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// TODO: Is there a cleaner way of doing this?
+	serverConfigBytes := new(bytes.Buffer)
+	if _, err := serverConfigBytes.ReadFrom(encoding.YAML(serverConfig)); err != nil {
+		panic(err)
+	}
+	
+	serverConfigMap := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "release-name-prometheus-server",
+			Labels: map[string]string{
+				"app": "prometheus",
+				"component": "server",
+			},
+		},
+		Data: map[string]string{
+			"prometheus.yml": serverConfigBytes.String(),
+		},
+	}
+
+	generator.Add("server-configmap.yaml", encoding.YAML(serverConfigMap))
+	
 	serverClusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
@@ -689,7 +1068,7 @@ func main() {
 		},
 	}
 
-	generator.Add("server-clusterole.yaml", encoding.YAML(serverClusterRole))\
+	generator.Add("server-clusterole.yaml", encoding.YAML(serverClusterRole))
 
 	serverClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -823,6 +1202,8 @@ func main() {
 		},
 	}
 
+	generator.Add("server-deployment.yaml", encoding.YAML(serverDeployment))
+	
 	serverPvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
