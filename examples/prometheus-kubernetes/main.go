@@ -26,35 +26,46 @@ const (
 	imagePullPolicyIfNotPresent = "IfNotPresent"
 )
 
+var (
+	int32One = int32(1)
+)
+
 func main() {
 	generator := mimic.New()
 	defer generator.Generate()
-	
-	// Alertmanager
-	
-	alertmanagerCrb := rbacv1beta1.ClusterRoleBinding{
+
+	generatePrometheusServer(generator)
+	generateAlertmanager(generator)
+	generatePushGateway(generator)
+	generateKubeStateMetrics(generator)
+	generateNodeExporter(generator)
+}
+
+
+func generateAlertmanager(generator *mimic.Generator) {
+	alertmanagerClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind: "ClusterRole",
-			Name: "cluster-admin",
+			Kind:     "ClusterRole",
+			Name:     "cluster-admin",
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
-				Kind: rbacv1beta1.ServiceAccountKind,
-				Name: "release-name-prometheus-alertmanager",
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Name:      "release-name-prometheus-alertmanager",
 				Namespace: namespace,
 			},
 		},
 	}
-	
-	generator.Add("alertmanager-clusterrolebinding.yaml", encoding.YAML(alertmanagerCrb))
+
+	generator.Add("alertmanager-clusterrolebinding.yaml", encoding.YAML(alertmanagerClusterRoleBinding))
 
 	fiveMinutes, err := model.ParseDuration("5m")
 	if err != nil {
@@ -68,7 +79,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	alertManagerConfig := amConfig.Config{
 		Receivers: []*amConfig.Receiver{
 			{
@@ -76,19 +87,18 @@ func main() {
 			},
 		},
 		Route: &amConfig.Route{
-			GroupInterval: &fiveMinutes,
-			GroupWait: &tenSeconds,
-			Receiver: "default-receiver",
+			GroupInterval:  &fiveMinutes,
+			GroupWait:      &tenSeconds,
+			Receiver:       "default-receiver",
 			RepeatInterval: &threeHours,
-			
 		},
 	}
-	
+
 	alertmanagerConfigMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
@@ -98,14 +108,14 @@ func main() {
 	}
 
 	generator.Add("alertmanager-configmap.yaml", encoding.YAML(alertmanagerConfigMap))
-	
+
 	int32One := int32(1)
-	
+
 	alertManagerDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
@@ -114,7 +124,7 @@ func main() {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "prometheus",
+						"app":       "prometheus",
 						"component": "alertmanager",
 					},
 				},
@@ -122,8 +132,8 @@ func main() {
 					ServiceAccountName: "prometheus-alertmanager",
 					Containers: []corev1.Container{
 						{
-							Name: "prometheus-alertmanager",
-							Image: "prom/alertmanager:v0.14.0",
+							Name:            "prometheus-alertmanager",
+							Image:           "prom/alertmanager:v0.14.0",
 							ImagePullPolicy: imagePullPolicyIfNotPresent,
 							Args: []string{
 								"--config.file=/etc/config/alertmanager.yml",
@@ -143,23 +153,23 @@ func main() {
 									},
 								},
 								InitialDelaySeconds: 30,
-								TimeoutSeconds: 30,
+								TimeoutSeconds:      30,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "config-volume",
+									Name:      "config-volume",
 									MountPath: "/etc/config",
 								},
 								{
-									Name: "storage-volume",
+									Name:      "storage-volume",
 									MountPath: "/data",
-									SubPath: "",
+									SubPath:   "",
 								},
 							},
 						},
 						{
-							Name: "prometheus-alertmanager-configmap-reload",
-							Image: "jimmidyson/configmap-reload:v0.1",
+							Name:            "prometheus-alertmanager-configmap-reload",
+							Image:           "jimmidyson/configmap-reload:v0.1",
 							ImagePullPolicy: imagePullPolicyIfNotPresent,
 							Args: []string{
 								"--volume-dir=/etc/config",
@@ -167,9 +177,9 @@ func main() {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "config-volume",
+									Name:      "config-volume",
 									MountPath: "/etc/config",
-									ReadOnly: true,
+									ReadOnly:  true,
 								},
 							},
 						},
@@ -180,12 +190,12 @@ func main() {
 	}
 
 	generator.Add("alertmanager-deployment.yaml", encoding.YAML(alertManagerDeployment))
-	
+
 	alertManagerPvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
@@ -202,26 +212,26 @@ func main() {
 	}
 
 	generator.Add("alertmanager-pvc.yaml", encoding.YAML(alertManagerPvc))
-	
+
 	alertManagerService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "http",
-					Port: 80,
-					Protocol: "TCP",
+					Name:       "http",
+					Port:       80,
+					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(alertManagerPort),
 				},
 			},
 			Selector: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 			Type: corev1.ServiceTypeClusterIP,
@@ -229,26 +239,29 @@ func main() {
 	}
 
 	generator.Add("alertmanager-service.yaml", encoding.YAML(alertManagerService))
-	
+
 	alertManagerServiceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
 	}
 
 	generator.Add("alertmanager-serviceaccount.yaml", encoding.YAML(alertManagerServiceAccount))
-	
+
+}
+
+func generateKubeStateMetrics(generator *mimic.Generator) {
 	// Kube-state-metrics
-	
+
 	kubeStateMetricsClusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "alertmanager",
 			},
 		},
@@ -326,31 +339,31 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "kube-state-metrics",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind: "ClusterRole",
-			Name: "release-name-prometheus-kube-state-metrics",
+			Kind:     "ClusterRole",
+			Name:     "release-name-prometheus-kube-state-metrics",
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
-				Kind: rbacv1beta1.ServiceAccountKind,
-				Name: "release-name-prometheus-kube-state-metrics",
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Name:      "release-name-prometheus-kube-state-metrics",
 				Namespace: namespace,
 			},
 		},
 	}
 
 	generator.Add("kube-state-metrics-clusterrolebinding.yaml", encoding.YAML(kubeStateMetricsClusterRoleBinding))
-	
+
 	kubeStateMetricsDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "kube-state-metrics",
 			},
 		},
@@ -359,7 +372,7 @@ func main() {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "prometheus",
+						"app":       "prometheus",
 						"component": "kube-state-metrics",
 					},
 				},
@@ -389,21 +402,21 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "kube-state-metrics",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "http",
-					Port: 80,
-					Protocol: "TCP",
+					Name:       "http",
+					Port:       80,
+					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(8080),
 				},
 			},
 			Selector: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "kube-state-metrics",
 			},
 			Type: corev1.ServiceTypeClusterIP,
@@ -416,7 +429,7 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "kube-state-metrics",
 			},
 		},
@@ -424,51 +437,55 @@ func main() {
 
 	generator.Add("kube-state-metrics-serviceaccount.yaml", encoding.YAML(kubeStateMetricsServiceAccount))
 
+}
+
+func generateNodeExporter(generator *mimic.Generator) {
+
 	// Node-exporter
-	
+
 	nodeExporterClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "node-exporter",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind: "ClusterRole",
-			Name: "cluster-admin",
+			Kind:     "ClusterRole",
+			Name:     "cluster-admin",
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
-				Kind: rbacv1beta1.ServiceAccountKind,
-				Name: "release-name-prometheus-node-exporter",
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Name:      "release-name-prometheus-node-exporter",
 				Namespace: namespace,
 			},
 		},
 	}
 
 	generator.Add("node-exporter-clusterrolebinding.yaml", encoding.YAML(nodeExporterClusterRoleBinding))
-	
+
 	nodeExporterDaemonSet := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "node-exporter",
 			},
 		},
-		Spec:appsv1.DaemonSetSpec{
-			UpdateStrategy:appsv1.DaemonSetUpdateStrategy{
-				Type:appsv1.OnDeleteDaemonSetStrategyType,
+		Spec: appsv1.DaemonSetSpec{
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.OnDeleteDaemonSetStrategyType,
 			},
-			Template:corev1.PodTemplateSpec{
-				Spec:corev1.PodSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
 					ServiceAccountName: "release-name-prometheus-node-exporter",
 					Containers: []corev1.Container{
 						{
-							Name: "release-name-prometheus-node-exporter",
-							Image: "prom/node-exporter:v0.15.2",
+							Name:            "release-name-prometheus-node-exporter",
+							Image:           "prom/node-exporter:v0.15.2",
 							ImagePullPolicy: imagePullPolicyIfNotPresent,
 							Args: []string{
 								"--path.procfs=/host/proc",
@@ -476,28 +493,28 @@ func main() {
 							},
 							Ports: []corev1.ContainerPort{
 								{
-									Name: "metrics",
+									Name:          "metrics",
 									ContainerPort: 9100,
-									HostPort: 9100,
+									HostPort:      9100,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "proc",
+									Name:      "proc",
 									MountPath: "/host/proc",
-									ReadOnly: true,
+									ReadOnly:  true,
 								},
 								{
-									Name: "sys",
+									Name:      "sys",
 									MountPath: "/host/sys",
-									ReadOnly: true,
+									ReadOnly:  true,
 								},
 							},
 						},
 					},
-					HostNetwork:true,
-					HostPID:true,
-					Volumes:[]corev1.Volume{
+					HostNetwork: true,
+					HostPID:     true,
+					Volumes: []corev1.Volume{
 						{
 							Name: "proc",
 							VolumeSource: corev1.VolumeSource{
@@ -526,24 +543,24 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-node-exporter",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "node-exporter",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "metrics",
-					Port: 9100,
-					Protocol: "TCP",
+					Name:       "metrics",
+					Port:       9100,
+					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(9100),
 				},
 			},
 			Selector: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "node-exporter",
 			},
-			Type: corev1.ServiceTypeClusterIP,
+			Type:      corev1.ServiceTypeClusterIP,
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
@@ -554,21 +571,24 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-node-exporter",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "node-exporter",
 			},
 		},
 	}
 
 	generator.Add("node-exporter-serviceaccount.yaml", encoding.YAML(nodeExporterServiceAccount))
-	
+
+}
+
+func generatePushGateway(generator *mimic.Generator) {
 	// Pushgateway
 
 	pushgatewayDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "pushgateway",
 			},
 		},
@@ -577,7 +597,7 @@ func main() {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "prometheus",
+						"app":       "prometheus",
 						"component": "pushgateway",
 					},
 				},
@@ -600,7 +620,7 @@ func main() {
 									},
 								},
 								InitialDelaySeconds: 10,
-								TimeoutSeconds: 10,
+								TimeoutSeconds:      10,
 							},
 						},
 					},
@@ -610,26 +630,26 @@ func main() {
 	}
 
 	generator.Add("pushgateway-deployment.yaml", encoding.YAML(pushgatewayDeployment))
-	
+
 	pushgatewayService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "pushgateway",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "http",
-					Port: 9091,
-					Protocol: "TCP",
+					Name:       "http",
+					Port:       9091,
+					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(9091),
 				},
 			},
 			Selector: map[string]string{
-				"app": "prometheus",
+				"app":       "prometheus",
 				"component": "pushgateway",
 			},
 			Type: corev1.ServiceTypeClusterIP,
@@ -637,9 +657,9 @@ func main() {
 	}
 
 	generator.Add("pushgateway-service.yaml", encoding.YAML(pushgatewayService))
+}
 	
-	// Server
-
+func generatePrometheusServer(generator *mimic.Generator) {
 	serverConfig := prometheus.Config{
 		RuleFiles: []string{
 			"/etc/config/rules",
