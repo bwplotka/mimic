@@ -14,7 +14,6 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/alertmanager v0.18.0
 	github.com/prometheus/common v0.6.0
 	github.com/rodaine/hclencoder v0.0.0-20190213202847-fb9757bb536e
