@@ -57,16 +57,16 @@ func main() {
 	genRRTestPrometheus(
 		generator,
 		"prom-rr-test",
-		"v2.11.0-rc.0-clear",
-		"v0.5.0",
+		"v2.12.0-rc.0",
+		"v0.6.0",
 	)
 
 	// Streamed.
 	genRRTestPrometheus(
 		generator,
 		"prom-rr-test-streamed",
-		"v2.11.0-rc.0-rr-streaming",
-		"v0.5.0-rr-streamed2",
+		"v2.12.0-rc.0-rr-streaming",
+		"v0.6.0-master-rr-streaming",
 	)
 }
 
@@ -78,7 +78,7 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 		configVolumeMount = "/etc/prometheus"
 		sharedDataPath    = "/data-shared"
 
-		namespace = "rr-test"
+		namespace = "rr"
 
 		httpPort        = 9090
 		httpSidecarPort = 19190
@@ -95,8 +95,8 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 	)
 	var (
 		promDataPath    = path.Join(sharedDataPath, "prometheus")
-		prometheusImage = fmt.Sprintf("bplotka/prometheus:%s", promVersion)
-		thanosImage     = fmt.Sprintf("improbable/thanos:%s", thanosVersion)
+		prometheusImage = fmt.Sprintf("quay.io/thanos/prometheus:%s", promVersion)
+		thanosImage     = fmt.Sprintf("quay.io/thanos/thanos:%s", thanosVersion)
 	)
 
 	// Empty configuration, we don't need any scrape.
@@ -325,7 +325,6 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						selectorName: name,
-						"version":    fmt.Sprintf("prometheus%s_thanos%s", promVersion, thanosVersion),
 					},
 				},
 				Spec: corev1.PodSpec{
