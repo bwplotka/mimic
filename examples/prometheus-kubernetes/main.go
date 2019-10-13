@@ -7,6 +7,7 @@ import (
 	"github.com/bwplotka/mimic/providers/prometheus"
 	sdconfig "github.com/bwplotka/mimic/providers/prometheus/discovery/config"
 	"github.com/bwplotka/mimic/providers/prometheus/discovery/kubernetes"
+	"github.com/go-openapi/swag"
 	amConfig "github.com/prometheus/alertmanager/config"
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -20,14 +21,10 @@ import (
 )
 
 const (
-	namespace = "default"
+	namespace        = "default"
 	alertManagerPort = 9093
-	// This constant is not seemingly available in any of the k8s libraries
-	imagePullPolicyIfNotPresent = "IfNotPresent"
-)
-
-var (
-	int32One = int32(1)
+	appKey           = "key"
+	prometheusValue  = "prometheus"
 )
 
 func main() {
@@ -60,7 +57,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelKeep,
-						Regex: prometheus.MustNewRegexp("default;kubernetes;https"),
+						Regex:  prometheus.MustNewRegexp("default;kubernetes;https"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_namespace",
 							"__meta_kubernetes_service_name",
@@ -68,14 +65,8 @@ func generatePrometheusServer(generator *mimic.Generator) {
 						},
 					},
 				},
-				Scheme: "https",
-				HTTPClientConfig: config.HTTPClientConfig{
-					TLSConfig: config.TLSConfig{
-						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-						InsecureSkipVerify: true,
-					},
-					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-				},
+				Scheme:           "https",
+				HTTPClientConfig: defaultHttpClientConfig(),
 			},
 			{
 				JobName: "kubernetes-nodes",
@@ -89,14 +80,14 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelLabelMap,
-						Regex: prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
+						Regex:  prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
 					},
 					{
 						Replacement: "kubernetes.default.svc:443",
 						TargetLabel: "__address__",
 					},
 					{
-						Regex: prometheus.MustNewRegexp("(.+)"),
+						Regex:       prometheus.MustNewRegexp("(.+)"),
 						Replacement: "/api/v1/nodes/${1}/proxy/metrics",
 						TargetLabel: "__metrics_path__",
 						SourceLabels: model.LabelNames{
@@ -104,14 +95,8 @@ func generatePrometheusServer(generator *mimic.Generator) {
 						},
 					},
 				},
-				Scheme: "https",
-				HTTPClientConfig: config.HTTPClientConfig{
-					TLSConfig: config.TLSConfig{
-						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-						InsecureSkipVerify: true,
-					},
-					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-				},
+				Scheme:           "https",
+				HTTPClientConfig: defaultHttpClientConfig(),
 			},
 			{
 				JobName: "kubernetes-nodes-cadvisor",
@@ -125,14 +110,14 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelLabelMap,
-						Regex: prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
+						Regex:  prometheus.MustNewRegexp("__meta_kubernetes_node_label_(.+)"),
 					},
 					{
 						Replacement: "kubernetes.default.svc:443",
 						TargetLabel: "__address__",
 					},
 					{
-						Regex: prometheus.MustNewRegexp("(.+)"),
+						Regex:       prometheus.MustNewRegexp("(.+)"),
 						Replacement: "/api/v1/nodes/${1}/proxy/metrics/cadvisor",
 						TargetLabel: "__metrics_path__",
 						SourceLabels: model.LabelNames{
@@ -140,14 +125,8 @@ func generatePrometheusServer(generator *mimic.Generator) {
 						},
 					},
 				},
-				Scheme: "https",
-				HTTPClientConfig: config.HTTPClientConfig{
-					TLSConfig: config.TLSConfig{
-						CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-						InsecureSkipVerify: true,
-					},
-					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-				},
+				Scheme:           "https",
+				HTTPClientConfig: defaultHttpClientConfig(),
 			},
 			{
 				JobName: "kubernetes-service-endpoints",
@@ -161,14 +140,14 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelKeep,
-						Regex: prometheus.MustNewRegexp("true"),
+						Regex:  prometheus.MustNewRegexp("true"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_service_annotation_prometheus_io_scrape",
 						},
 					},
 					{
 						Action: prometheus.RelabelReplace,
-						Regex: prometheus.MustNewRegexp("(https?)"),
+						Regex:  prometheus.MustNewRegexp("(https?)"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_service_annotation_prometheus_io_scheme",
 						},
@@ -176,15 +155,15 @@ func generatePrometheusServer(generator *mimic.Generator) {
 					},
 					{
 						Action: prometheus.RelabelReplace,
-						Regex: prometheus.MustNewRegexp("(.+)"),
+						Regex:  prometheus.MustNewRegexp("(.+)"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_service_annotation_prometheus_io_path",
 						},
 						TargetLabel: "__metrics_path__",
 					},
 					{
-						Action: prometheus.RelabelReplace,
-						Regex: prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
+						Action:      prometheus.RelabelReplace,
+						Regex:       prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
 						Replacement: "$1:$2",
 						SourceLabels: model.LabelNames{
 							"__address__",
@@ -194,7 +173,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 					},
 					{
 						Action: prometheus.RelabelLabelMap,
-						Regex: prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
+						Regex:  prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
 					},
 					{
 						Action: prometheus.RelabelReplace,
@@ -221,7 +200,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 						},
 					},
 				},
-				HonorLabels:true,
+				HonorLabels: true,
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelKeep,
@@ -248,7 +227,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelKeep,
-						Regex: prometheus.MustNewRegexp("true"),
+						Regex:  prometheus.MustNewRegexp("true"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_service_annotation_prometheus_io_probe",
 						},
@@ -271,7 +250,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 					},
 					{
 						Action: prometheus.RelabelLabelMap,
-						Regex: prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
+						Regex:  prometheus.MustNewRegexp("__meta_kubernetes_service_label_(.+)"),
 					},
 					{
 						Action: prometheus.RelabelReplace,
@@ -301,22 +280,22 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				RelabelConfigs: []*prometheus.RelabelConfig{
 					{
 						Action: prometheus.RelabelKeep,
-						Regex: prometheus.MustNewRegexp("true"),
+						Regex:  prometheus.MustNewRegexp("true"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_service_annotation_prometheus_io_scrape",
 						},
 					},
 					{
 						Action: prometheus.RelabelReplace,
-						Regex: prometheus.MustNewRegexp("(.+)"),
+						Regex:  prometheus.MustNewRegexp("(.+)"),
 						SourceLabels: model.LabelNames{
 							"__meta_kubernetes_pod_annotation_prometheus_io_path",
 						},
 						TargetLabel: "__metrics_path__",
 					},
 					{
-						Action: prometheus.RelabelReplace,
-						Regex: prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
+						Action:      prometheus.RelabelReplace,
+						Regex:       prometheus.MustNewRegexp("([^:]+)(?::\\d+)?;(\\d+)"),
 						Replacement: "$1:$2",
 						SourceLabels: model.LabelNames{
 							"__address__",
@@ -326,7 +305,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 					},
 					{
 						Action: prometheus.RelabelLabelMap,
-						Regex: prometheus.MustNewRegexp("__meta_kubernetes_pod_label_(.+)"),
+						Regex:  prometheus.MustNewRegexp("__meta_kubernetes_pod_label_(.+)"),
 					},
 					{
 						Action: prometheus.RelabelReplace,
@@ -345,7 +324,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 				},
 			},
 		},
-		AlertingConfig:prometheus.AlertingConfig{
+		AlertingConfig: prometheus.AlertingConfig{
 			AlertmanagerConfigs: []*prometheus.AlertmanagerConfig{
 				{
 					ServiceDiscoveryConfig: sdconfig.ServiceDiscoveryConfig{
@@ -355,13 +334,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 							},
 						},
 					},
-					HTTPClientConfig: config.HTTPClientConfig{
-						TLSConfig: config.TLSConfig{
-							CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-							InsecureSkipVerify: true,
-						},
-						BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-					},
+					HTTPClientConfig: defaultHttpClientConfig(),
 					RelabelConfigs: []*prometheus.RelabelConfig{
 						{
 							Action: prometheus.RelabelKeep,
@@ -375,7 +348,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 							SourceLabels: model.LabelNames{
 								"__meta_kubernetes_pod_label_app",
 							},
-							Regex: prometheus.MustNewRegexp("prometheus"),
+							Regex: prometheus.MustNewRegexp(prometheusValue),
 						},
 						{
 							Action: prometheus.RelabelKeep,
@@ -398,7 +371,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 
 	// TODO: Is there a cleaner way of doing this?
 	serverConfigBytes := new(bytes.Buffer)
-	if _, err := serverConfigBytes.ReadFrom(encoding.YAML(serverConfig)); err != nil {
+	if _, err := serverConfigBytes.ReadFrom(encoding.GhodssYAML(serverConfig)); err != nil {
 		panic(err)
 	}
 
@@ -406,7 +379,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
@@ -415,13 +388,11 @@ func generatePrometheusServer(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("server-configmap.yaml", encoding.YAML(serverConfigMap))
-
 	serverClusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
@@ -465,51 +436,47 @@ func generatePrometheusServer(generator *mimic.Generator) {
 			},
 			{
 				NonResourceURLs: []string{"/metrics"},
-				Verbs: []string{"get"},
+				Verbs:           []string{"get"},
 			},
 		},
 	}
-
-	generator.Add("server-clusterole.yaml", encoding.YAML(serverClusterRole))
 
 	serverClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind: "ClusterRole",
-			Name: "release-name-prometheus-server",
+			Kind:     "ClusterRole",
+			Name:     "release-name-prometheus-server",
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
-				Kind: rbacv1beta1.ServiceAccountKind,
-				Name: "release-name-prometheus-server",
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Name:      "release-name-prometheus-server",
 				Namespace: namespace,
 			},
 		},
 	}
 
-	generator.Add("server-clusterrolebinding.yaml", encoding.YAML(serverClusterRoleBinding))
-
 	serverDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &int32One,
+			Replicas: swag.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "prometheus",
+						appKey:      prometheusValue,
 						"component": "server",
 					},
 				},
@@ -517,43 +484,43 @@ func generatePrometheusServer(generator *mimic.Generator) {
 					ServiceAccountName: "release-name-prometheus-server",
 					InitContainers: []corev1.Container{
 						{
-							Name: "init-chown-data",
-							Image: "busybox:latest",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							Name:            "init-chown-data",
+							Image:           "busybox:latest",
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
 								// 65534 is the nobody user that prometheus uses.
 								"chown", "-R", "65534:65534", "/data",
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "storage-volume",
+									Name:      "storage-volume",
 									MountPath: "/data",
-									SubPath: "",
+									SubPath:   "",
 								},
 							},
 						},
 					},
 					Containers: []corev1.Container{
 						{
-							Name: "prometheus-server-configmap-reload",
-							Image: "jimmidyson/configmap-reload:v0.1",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							Name:            "prometheus-server-configmap-reload",
+							Image:           "jimmidyson/configmap-reload:v0.1",
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Args: []string{
 								"--volume-dir=/etc/config",
 								"--webhook-url=http://localhost:9090/-/reload",
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "config-volume",
+									Name:      "config-volume",
 									MountPath: "/etc/config",
-									ReadOnly: true,
+									ReadOnly:  true,
 								},
 							},
 						},
 						{
-							Name: "prometheus-server",
-							Image: "prom/prometheus:v2.2.1",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							Name:            "prometheus-server",
+							Image:           "prom/prometheus:v2.2.1",
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Args: []string{
 								"--config.file=/etc/config/prometheus.yml",
 								"--storage.tsdb.path=/data",
@@ -574,7 +541,7 @@ func generatePrometheusServer(generator *mimic.Generator) {
 									},
 								},
 								InitialDelaySeconds: 30,
-								TimeoutSeconds: 30,
+								TimeoutSeconds:      30,
 							},
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
@@ -584,17 +551,17 @@ func generatePrometheusServer(generator *mimic.Generator) {
 									},
 								},
 								InitialDelaySeconds: 30,
-								TimeoutSeconds: 30,
+								TimeoutSeconds:      30,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "config-volume",
+									Name:      "config-volume",
 									MountPath: "/etc/config",
 								},
 								{
-									Name: "storage-volume",
+									Name:      "storage-volume",
 									MountPath: "/data",
-									SubPath: "",
+									SubPath:   "",
 								},
 							},
 						},
@@ -604,13 +571,11 @@ func generatePrometheusServer(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("server-deployment.yaml", encoding.YAML(serverDeployment))
-
 	serverPvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
@@ -626,46 +591,47 @@ func generatePrometheusServer(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("server-pvc.yaml", encoding.YAML(serverPvc))
-
 	serverService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "http",
-					Port: 80,
-					Protocol: "TCP",
+					Name:       "http",
+					Port:       80,
 					TargetPort: intstr.FromInt(9090),
 				},
 			},
 			Selector: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 			Type: corev1.ServiceTypeClusterIP,
 		},
 	}
 
-	generator.Add("server-service.yaml", encoding.YAML(serverService))
-
 	serverServiceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-server",
 			Labels: map[string]string{
-				"app": "prometheus",
+				appKey:      prometheusValue,
 				"component": "server",
 			},
 		},
 	}
 
-	generator.Add("server-serviceaccount.yaml", encoding.YAML(serverServiceAccount))
+	generator.Add("server-configmap.yaml", encoding.GhodssYAML(serverConfigMap))
+	generator.Add("server-clusterole.yaml", encoding.GhodssYAML(serverClusterRole))
+	generator.Add("server-clusterrolebinding.yaml", encoding.GhodssYAML(serverClusterRoleBinding))
+	generator.Add("server-deployment.yaml", encoding.GhodssYAML(serverDeployment))
+	generator.Add("server-pvc.yaml", encoding.GhodssYAML(serverPvc))
+	generator.Add("server-service.yaml", encoding.GhodssYAML(serverService))
+	generator.Add("server-serviceaccount.yaml", encoding.GhodssYAML(serverServiceAccount))
 }
 
 func generateAlertmanager(generator *mimic.Generator) {
@@ -673,7 +639,7 @@ func generateAlertmanager(generator *mimic.Generator) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
@@ -691,20 +657,9 @@ func generateAlertmanager(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("alertmanager-clusterrolebinding.yaml", encoding.YAML(alertmanagerClusterRoleBinding))
-
-	fiveMinutes, err := model.ParseDuration("5m")
-	if err != nil {
-		panic(err)
-	}
-	tenSeconds, err := model.ParseDuration("10s")
-	if err != nil {
-		panic(err)
-	}
-	threeHours, err := model.ParseDuration("3h")
-	if err != nil {
-		panic(err)
-	}
+	fiveMinutes := mustParseDuration("5m")
+	tenSeconds := mustParseDuration("10s")
+	threeHours := mustParseDuration("3h")
 
 	alertManagerConfig := amConfig.Config{
 		Receivers: []*amConfig.Receiver{
@@ -724,7 +679,7 @@ func generateAlertmanager(generator *mimic.Generator) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
@@ -733,24 +688,20 @@ func generateAlertmanager(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("alertmanager-configmap.yaml", encoding.YAML(alertmanagerConfigMap))
-
-	int32One := int32(1)
-
 	alertManagerDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &int32One,
+			Replicas: swag.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":       "prometheus",
+						appKey:      prometheusValue,
 						"component": "alertmanager",
 					},
 				},
@@ -760,7 +711,7 @@ func generateAlertmanager(generator *mimic.Generator) {
 						{
 							Name:            "prometheus-alertmanager",
 							Image:           "prom/alertmanager:v0.14.0",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Args: []string{
 								"--config.file=/etc/config/alertmanager.yml",
 								"--storage.path=/data",
@@ -796,7 +747,7 @@ func generateAlertmanager(generator *mimic.Generator) {
 						{
 							Name:            "prometheus-alertmanager-configmap-reload",
 							Image:           "jimmidyson/configmap-reload:v0.1",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Args: []string{
 								"--volume-dir=/etc/config",
 								"--webhook-url=http://localhost:9093/-/reload",
@@ -815,13 +766,11 @@ func generateAlertmanager(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("alertmanager-deployment.yaml", encoding.YAML(alertManagerDeployment))
-
 	alertManagerPvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
@@ -837,13 +786,11 @@ func generateAlertmanager(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("alertmanager-pvc.yaml", encoding.YAML(alertManagerPvc))
-
 	alertManagerService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
@@ -852,51 +799,50 @@ func generateAlertmanager(generator *mimic.Generator) {
 				{
 					Name:       "http",
 					Port:       80,
-					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(alertManagerPort),
 				},
 			},
 			Selector: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 			Type: corev1.ServiceTypeClusterIP,
 		},
 	}
 
-	generator.Add("alertmanager-service.yaml", encoding.YAML(alertManagerService))
-
 	alertManagerServiceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
 	}
 
-	generator.Add("alertmanager-serviceaccount.yaml", encoding.YAML(alertManagerServiceAccount))
-
+	generator.Add("alertmanager-clusterrolebinding.yaml", encoding.GhodssYAML(alertmanagerClusterRoleBinding))
+	generator.Add("alertmanager-configmap.yaml", encoding.GhodssYAML(alertmanagerConfigMap))
+	generator.Add("alertmanager-deployment.yaml", encoding.GhodssYAML(alertManagerDeployment))
+	generator.Add("alertmanager-pvc.yaml", encoding.GhodssYAML(alertManagerPvc))
+	generator.Add("alertmanager-service.yaml", encoding.GhodssYAML(alertManagerService))
+	generator.Add("alertmanager-serviceaccount.yaml", encoding.GhodssYAML(alertManagerServiceAccount))
 }
 
 func generatePushGateway(generator *mimic.Generator) {
-	// Pushgateway
-
 	pushgatewayDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "pushgateway",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &int32One,
+			Replicas: swag.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":       "prometheus",
+						appKey:      prometheusValue,
 						"component": "pushgateway",
 					},
 				},
@@ -905,7 +851,7 @@ func generatePushGateway(generator *mimic.Generator) {
 						{
 							Name:            "prometheus-pushgateway",
 							Image:           "prom/pushgateway:v0.4.0",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 9091,
@@ -928,13 +874,11 @@ func generatePushGateway(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("pushgateway-deployment.yaml", encoding.YAML(pushgatewayDeployment))
-
 	pushgatewayService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-alertmanager",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "pushgateway",
 			},
 		},
@@ -943,29 +887,27 @@ func generatePushGateway(generator *mimic.Generator) {
 				{
 					Name:       "http",
 					Port:       9091,
-					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(9091),
 				},
 			},
 			Selector: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "pushgateway",
 			},
 			Type: corev1.ServiceTypeClusterIP,
 		},
 	}
 
-	generator.Add("pushgateway-service.yaml", encoding.YAML(pushgatewayService))
+	generator.Add("pushgateway-deployment.yaml", encoding.GhodssYAML(pushgatewayDeployment))
+	generator.Add("pushgateway-service.yaml", encoding.GhodssYAML(pushgatewayService))
 }
 
 func generateKubeStateMetrics(generator *mimic.Generator) {
-	// Kube-state-metrics
-
 	kubeStateMetricsClusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "alertmanager",
 			},
 		},
@@ -1037,13 +979,11 @@ func generateKubeStateMetrics(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("kube-state-metrics-clusterrole.yaml", encoding.YAML(kubeStateMetricsClusterRole))
-
 	kubeStateMetricsClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "kube-state-metrics",
 			},
 		},
@@ -1061,22 +1001,20 @@ func generateKubeStateMetrics(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("kube-state-metrics-clusterrolebinding.yaml", encoding.YAML(kubeStateMetricsClusterRoleBinding))
-
 	kubeStateMetricsDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "kube-state-metrics",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &int32One,
+			Replicas: swag.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":       "prometheus",
+						appKey:      prometheusValue,
 						"component": "kube-state-metrics",
 					},
 				},
@@ -1086,7 +1024,7 @@ func generateKubeStateMetrics(generator *mimic.Generator) {
 						{
 							Name:            "prometheus-kube-state-metrics",
 							Image:           "k8s.gcr.io/kube-state-metrics:v1.2.0",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8080,
@@ -1100,58 +1038,54 @@ func generateKubeStateMetrics(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("kube-state-metrics-deployment.yaml", encoding.YAML(kubeStateMetricsDeployment))
-
 	kubeStateMetricsService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "kube-state-metrics",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
-					Port:       80,
-					Protocol:   "TCP",
+					Name: "http",
+					Port: 80,
+
 					TargetPort: intstr.FromInt(8080),
 				},
 			},
 			Selector: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "kube-state-metrics",
 			},
 			Type: corev1.ServiceTypeClusterIP,
 		},
 	}
 
-	generator.Add("kube-state-metrics-service.yaml", encoding.YAML(kubeStateMetricsService))
-
 	kubeStateMetricsServiceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-kube-state-metrics",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "kube-state-metrics",
 			},
 		},
 	}
 
-	generator.Add("kube-state-metrics-serviceaccount.yaml", encoding.YAML(kubeStateMetricsServiceAccount))
-
+	generator.Add("kube-state-metrics-clusterrole.yaml", encoding.GhodssYAML(kubeStateMetricsClusterRole))
+	generator.Add("kube-state-metrics-clusterrolebinding.yaml", encoding.GhodssYAML(kubeStateMetricsClusterRoleBinding))
+	generator.Add("kube-state-metrics-deployment.yaml", encoding.GhodssYAML(kubeStateMetricsDeployment))
+	generator.Add("kube-state-metrics-service.yaml", encoding.GhodssYAML(kubeStateMetricsService))
+	generator.Add("kube-state-metrics-serviceaccount.yaml", encoding.GhodssYAML(kubeStateMetricsServiceAccount))
 }
 
 func generateNodeExporter(generator *mimic.Generator) {
-
-	// Node-exporter
-
 	nodeExporterClusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "node-exporter",
 			},
 		},
@@ -1169,13 +1103,11 @@ func generateNodeExporter(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("node-exporter-clusterrolebinding.yaml", encoding.YAML(nodeExporterClusterRoleBinding))
-
 	nodeExporterDaemonSet := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "node-exporter",
 			},
 		},
@@ -1190,7 +1122,7 @@ func generateNodeExporter(generator *mimic.Generator) {
 						{
 							Name:            "release-name-prometheus-node-exporter",
 							Image:           "prom/node-exporter:v0.15.2",
-							ImagePullPolicy: imagePullPolicyIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Args: []string{
 								"--path.procfs=/host/proc",
 								"--path.sysfs=/host/sys",
@@ -1241,13 +1173,11 @@ func generateNodeExporter(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("node-exporter-daemonset.yaml", encoding.YAML(nodeExporterDaemonSet))
-
 	nodeExporterService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-node-exporter",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "node-exporter",
 			},
 		},
@@ -1256,12 +1186,11 @@ func generateNodeExporter(generator *mimic.Generator) {
 				{
 					Name:       "metrics",
 					Port:       9100,
-					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(9100),
 				},
 			},
 			Selector: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "node-exporter",
 			},
 			Type:      corev1.ServiceTypeClusterIP,
@@ -1269,18 +1198,36 @@ func generateNodeExporter(generator *mimic.Generator) {
 		},
 	}
 
-	generator.Add("node-exporter-service.yaml", encoding.YAML(nodeExporterService))
-
 	nodeExporterServiceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "release-name-prometheus-node-exporter",
 			Labels: map[string]string{
-				"app":       "prometheus",
+				appKey:      prometheusValue,
 				"component": "node-exporter",
 			},
 		},
 	}
 
-	generator.Add("node-exporter-serviceaccount.yaml", encoding.YAML(nodeExporterServiceAccount))
+	generator.Add("node-exporter-clusterrolebinding.yaml", encoding.GhodssYAML(nodeExporterClusterRoleBinding))
+	generator.Add("node-exporter-daemonset.yaml", encoding.GhodssYAML(nodeExporterDaemonSet))
+	generator.Add("node-exporter-service.yaml", encoding.GhodssYAML(nodeExporterService))
+	generator.Add("node-exporter-serviceaccount.yaml", encoding.GhodssYAML(nodeExporterServiceAccount))
+}
 
+func defaultHttpClientConfig() config.HTTPClientConfig {
+	return config.HTTPClientConfig{
+		TLSConfig: config.TLSConfig{
+			CAFile:             "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			InsecureSkipVerify: true,
+		},
+		BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	}
+}
+
+func mustParseDuration(durationString string) model.Duration {
+	duration, err := model.ParseDuration(durationString)
+	if err != nil {
+		panic(err)
+	}
+	return duration
 }
