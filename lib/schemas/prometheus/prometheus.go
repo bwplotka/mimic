@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	sdconfig "github.com/bwplotka/mimic/providers/prometheus/discovery/config"
+	sdconfig "github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/config"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 )

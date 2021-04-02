@@ -7,7 +7,7 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/bwplotka/mimic/abstractions/kubernetes/volumes"
+	"github.com/bwplotka/mimic/lib/abstr/kubernetes/volumes"
 	"github.com/go-openapi/swag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +18,7 @@ import (
 
 	"github.com/bwplotka/mimic"
 	"github.com/bwplotka/mimic/encoding"
-	"github.com/bwplotka/mimic/providers/prometheus"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus"
 )
 
 const (
@@ -107,9 +107,8 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 			},
 		},
 	}))
-	if err != nil {
-		mimic.PanicErr(err)
-	}
+	mimic.PanicIfErr(err)
+
 	promConfigAndMount := volumes.ConfigAndMount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configVolumeName,

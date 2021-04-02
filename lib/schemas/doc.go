@@ -23,4 +23,4 @@ providers
     - vault     // Terraform provider/resource configuration used by terraform.
 ```
 */
-package providers
+package schemas

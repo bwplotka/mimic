@@ -10,4 +10,4 @@ abstractions
     - prometheus // Kubernetes abstractions for the deployment of Prometheus.
 ```
 */
-package abstractions
+package abstr
