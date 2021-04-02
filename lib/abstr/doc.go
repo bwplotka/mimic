@@ -1,3 +1,6 @@
+// Copyright (c) bwplotka/mimic Authors
+// Licensed under the Apache License 2.0.
+
 /*
 Abstractions are used to (as the name suggests) abstract away the underlying config and structs to the caller allowing
 complex configurations or concepts to be created with minimal code.

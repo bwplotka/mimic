@@ -1,3 +1,6 @@
+// Copyright (c) bwplotka/mimic Authors
+// Licensed under the Apache License 2.0.
+
 /*
 encoding is a package of default encodings supplied with mimic.
 

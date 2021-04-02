@@ -1,3 +1,6 @@
+// Copyright (c) bwplotka/mimic Authors
+// Licensed under the Apache License 2.0.
+
 /*
 Providers are a way of defining a configuration specification in Go structs for projects that either do not currently
 expose their configuration structs or are difficult to work with (due to deps, complexity etc.).

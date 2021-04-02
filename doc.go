@@ -1,3 +1,6 @@
+// Copyright (c) bwplotka/mimic Authors
+// Licensed under the Apache License 2.0.
+
 /*
 `mimic`: A Go module for defining and generating config in Go:
 

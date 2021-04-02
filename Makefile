@@ -1,19 +1,41 @@
-GOBIN ?= ${GOPATH}/bin
+include .bingo/Variables.mk
+
 GO ?= $(shell which go)
-
 FILES_TO_FMT      ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
-
-GOJSONSCHEMA         := $(GOBIN)/gojsonschema
-
-GOIMPORTS_VERSION    ?= 9d4d845e86f14303813298ede731a971dd65b593
-GOIMPORTS            ?= $(GOBIN)/goimports-$(GOIMPORTS_VERSION)
-GOLANGCILINT_VERSION ?= v1.17.1
-GOLANGCILINT         ?= $(GOBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
-LICHE_VERSION        ?= 2a2e6e56f6c615c17b2e116669c4cdb31b5453f3
-LICHE                ?= $(GOBIN)/liche-$(LICHE_VERSION)
 
 GO111MODULE       ?= on
 export GO111MODULE
+
+GOBIN             ?= $(firstword $(subst :, ,${GOPATH}))/bin
+
+# Tools.
+GIT               ?= $(shell which git)
+
+# Support gsed on OSX (installed via brew), falling back to sed. On Linux
+# systems gsed won't be installed, so will use sed as expected.
+SED ?= $(shell which gsed 2>/dev/null || which sed)
+
+define require_clean_work_tree
+	@git update-index -q --ignore-submodules --refresh
+
+    @if ! git diff-files --quiet --ignore-submodules --; then \
+        echo >&2 "cannot $1: you have unstaged changes."; \
+        git diff-files --name-status -r --ignore-submodules -- >&2; \
+        echo >&2 "Please commit or stash them."; \
+        exit 1; \
+    fi
+
+    @if ! git diff-index --cached --quiet HEAD --ignore-submodules --; then \
+        echo >&2 "cannot $1: your index contains uncommitted changes."; \
+        git diff-index --cached --name-status -r --ignore-submodules HEAD -- >&2; \
+        echo >&2 "Please commit or stash them."; \
+        exit 1; \
+    fi
+
+endef
+
+help: ## Displays help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: all
 all: format test
@@ -26,30 +48,6 @@ update-go-deps:
 	done
 	@$(GO) mod tidy
 
-# check-docs checks if documentation have discrepancy with flags and if the links are valid.
-.PHONY: check-docs
-check-docs: $(LICHE)
-	@$(LICHE) --document-root . *.md
-
-.PHONY: check-go-mod
-check-go-mod:
-	@go mod verify
-
-.PHONY: format
-format: $(GOIMPORTS)
-	@echo ">> formatting code"
-	@$(GOIMPORTS) -w $(FILES_TO_FMT)
-
-gen-dockercompose-config: $(GOJSONSCHEMA)
-	@echo ">> generating"
-	@$(GOJSONSCHEMA) -o providers/dockercompose/config_v3_7.go -p dockercompose providers/dockercompose/config_schema_v3.7.json
-
-.PHONY: lint
-lint: $(GOLANGCILINT)
-	@echo ">> linting all of the Go files"
-	@$(GOLANGCILINT) run --disable-all -E goimports ./...
-	@$(GOLANGCILINT) run ./...
-
 .PHONY: test
 test:
 	@echo ">> testing binaries"
@@ -58,24 +56,43 @@ test:
 	@cd examples/prometheus-remote-read-benchmark && go run main.go generate
 	@cd examples/terraform && go run main.go generate
 
-# $(1): Go install path. (e.g github.com/campoy/embedmd)
-# $(2): Tag.
-define fetch_go_bin_version
-	@echo ">> installing $(1) at $(2)"
-	@GO111MODULE=on GOOS= GOARCH= go get $(1)@$(2)
-	@mv -- '$(GOBIN)/$(shell basename $(1))' '$(GOBIN)/$(shell basename $(1))-$(2)'
+
+.PHONY: deps
+deps: ## Ensures fresh go.mod and go.sum.
 	@go mod tidy
-endef
+	@go mod verify
 
-$(GOIMPORTS):
-	$(call fetch_go_bin_version,golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
+.PHONY: format
+format: ## Formats Go code including imports and cleans up white noise.
+format: $(GOIMPORTS)
+	@echo ">> formatting code"
+	@$(GOIMPORTS) -w $(FILES_TO_FMT)
 
-$(GOJSONSCHEMA):
-	@echo ">> installing gojsonschema"
-	@GO111MODULE=on GOOS= GOARCH= $(GO) install github.com/atombender/go-jsonschema/cmd/gojsonschema
+.PHONY: check-git
+check-git:
+ifneq ($(GIT),)
+	@test -x $(GIT) || (echo >&2 "No git executable binary found at $(GIT)."; exit 1)
+else
+	@echo >&2 "No git binary found."; exit 1
+endif
 
-$(GOLANGCILINT):
-	$(call fetch_go_bin_version,github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCILINT_VERSION))
-
-$(LICHE):
-	$(call fetch_go_bin_version,github.com/raviqqe/liche,$(LICHE_VERSION))
+# PROTIP:
+# Add
+#      --cpu-profile-path string   Path to CPU profile output file
+#      --mem-profile-path string   Path to memory profile output file
+# to debug big allocations during linting.
+lint: ## Runs various static analysis against our code.
+lint: $(FAILLINT) $(GOLANGCI_LINT) $(COPYRIGHT) $(MISSPELL) format check-git deps
+	$(call require_clean_work_tree,"detected not clean master before running lint")
+	@echo ">> verifying modules being imported"
+	@$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
+	@$(FAILLINT) -paths "fmt.{Print,PrintfPrintln,Sprint}" -ignore-tests ./...
+	@echo ">> examining all of the Go files"
+	@go vet -stdmethods=false ./...
+	@echo ">> linting all of the Go files GOGC=${GOGC}"
+	@$(GOLANGCI_LINT) run
+	@echo ">> detecting misspells"
+	@find . -type f | grep -v vendor/ | grep -vE '\./\..*' | xargs $(MISSPELL) -error
+	@echo ">> ensuring Copyright headers"
+	@$(COPYRIGHT) $(shell go list -f "{{.Dir}}" ./... | xargs -i find "{}" -name "*.go")
+	$(call require_clean_work_tree,"detected white noise or/and files without copyright; run 'make lint' file and commit changes.")
