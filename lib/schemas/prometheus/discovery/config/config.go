@@ -14,18 +14,18 @@
 package sdconfig
 
 import (
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/azure"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/consul"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/dns"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/ec2"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/file"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/gce"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/kubernetes"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/marathon"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/openstack"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/targetgroup"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/triton"
-	"github.com/bwplotka/mimic/providers/prometheus/discovery/zookeeper"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/azure"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/consul"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/dns"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/ec2"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/file"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/gce"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/kubernetes"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/marathon"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/openstack"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/targetgroup"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/triton"
+	"github.com/bwplotka/mimic/lib/schemas/prometheus/discovery/zookeeper"
 )
 
 // ServiceDiscoveryConfig configures lists of different service discovery mechanisms.

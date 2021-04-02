@@ -1,4 +1,5 @@
 GOBIN ?= ${GOPATH}/bin
+GO ?= $(shell which go)
 
 FILES_TO_FMT      ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 
@@ -16,6 +17,14 @@ export GO111MODULE
 
 .PHONY: all
 all: format test
+
+.PHONY: update-go-deps
+update-go-deps:
+	@echo ">> updating Go dependencies"
+	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		$(GO) get $$m; \
+	done
+	@$(GO) mod tidy
 
 # check-docs checks if documentation have discrepancy with flags and if the links are valid.
 .PHONY: check-docs
@@ -43,8 +52,11 @@ lint: $(GOLANGCILINT)
 
 .PHONY: test
 test:
-	@echo ">> building binaries"
+	@echo ">> testing binaries"
 	@go test ./...
+	@cd examples/kubernetes-statefulset && go run example.go generate
+	@cd examples/prometheus-remote-read-benchmark && go run main.go generate
+	@cd examples/terraform && go run main.go generate
 
 # $(1): Go install path. (e.g github.com/campoy/embedmd)
 # $(2): Tag.

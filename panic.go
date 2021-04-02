@@ -11,3 +11,11 @@ func Panicf(format string, a ...interface{}) {
 func PanicErr(err error) {
 	Panicf("failed to execute; err:", err)
 }
+
+// PanicIfErr allows to panic on error.
+func PanicIfErr(err error) {
+	if err == nil {
+		return
+	}
+	PanicErr(err)
+}
