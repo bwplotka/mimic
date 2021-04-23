@@ -12,7 +12,7 @@ func Panicf(format string, a ...interface{}) {
 
 // PanicErr allows to panic because of certain error.
 func PanicErr(err error) {
-	Panicf("failed to execute; err:", err)
+	Panicf("failed to execute; err: %v", err)
 }
 
 // PanicIfErr allows to panic on error.
