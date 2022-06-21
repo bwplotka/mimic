@@ -1,27 +1,45 @@
 # Mimic - Define your Configuration, Infrastructure and Deployments as Go Code
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mimic)](https://goreportcard.com/report/github.com/bwplotka/mimic) 
-[![GoDoc](https://godoc.org/github.com/bwplotka/mimic?status.svg)](https://godoc.org/github.com/bwplotka/mimic)
+[![GoDoc](https://godoc.org/github.com/bwplotka/mimic?status.svg)](https://pkg.go.dev/github.com/bwplotka/mimic)
 
-`mimic`: A Go module for defining and generating config in Go:
+`mimic`: A Go module for defining, templating and generating configuration in Go:
 
 * Define your Configuration (e.g Envoy, Prometheus, Alertmanager, Nginx, Prometheus Alerts, Rules, Grafana Dashaboards etc.)
 * Define your Infrastructure (e.g Terraform, Ansible, Puppet, Chef, Kubernetes etc)
-* Define any other file that you can imagine
+* Define any other file that you can imagine.
 
 ...using simple, typed and testable Go code!
 
-_`mimic`: Mimic is a super-human with the ability to copy the powers and abilities of others._
+_`mimic`: https://marvel.fandom.com/wiki/Power_Mimicry[Mimic is a super-human with the ability to copy the powers and abilities of others]._
 
 ## Getting Started
 
-1. Create a new go file for your config e.g `config/example.go`
-1. Import mimic using Go 1.12+ via `import "github.com/bwplotka/mimic"`
-1. Add configuration in your `main` package using the `mimic` module 
-1. Run `go run config/example.go generate`
-1. You will now see the generated Kubernetes YAML file here: `cat gen/config/some-statefulset.yaml`
+1. Create a new `.go` file for your config e.g `config/example.go`
+2. Import mimic using Go 1.17+ e.g `go get github.com/bwplotka/mimic@latest`
+3. Instantiate mimic and defer generation in your `main` function using the `mimic` module:
 
-For [example](examples/kubernetes-statefulset/example.go):
+  ```go
+    package main
+
+    import ( 
+		"github.com/bwplotka/mimic"
+    )
+
+    func main() {
+        generator := mimic.New() 
+		
+		// Defer Generate to ensure we generate the output.
+        defer generator.Generate()
+          
+		//...
+  ```
+
+4. Add typed configuration in your `main` to each file using encoding you want using `With` method: `generator.With("config").Add("some.yaml", encoding.GhodssYAML(set))`
+5. Run `go run config/example.go generate`
+6. You will now see the generated Kubernetes YAML file here: `cat gen/config/some.yaml`
+
+See full [example](examples/kubernetes-statefulset/example.go) here:
     
  ```go
     package main
@@ -87,7 +105,6 @@ For [example](examples/kubernetes-statefulset/example.go):
     	generator.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
     }
 ```   
-    
  
 Now you are ready to start defining your own resources! 
 

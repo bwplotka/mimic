@@ -53,7 +53,7 @@ test:
 	@echo ">> testing binaries"
 	@go test ./...
 	@cd examples/kubernetes-statefulset && go run example.go generate
-	@cd examples/prometheus-remote-read-benchmark && go run main.go generate
+	@cd examples/prometheus-rem-read-benchmark && go run main.go generate
 	@cd examples/terraform && go run main.go generate
 
 
@@ -85,7 +85,7 @@ lint: ## Runs various static analysis against our code.
 lint: $(FAILLINT) $(GOLANGCI_LINT) $(COPYRIGHT) $(MISSPELL) format check-git deps
 	$(call require_clean_work_tree,"detected not clean master before running lint")
 	@echo ">> verifying modules being imported"
-	@$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
+	@$(FAILLINT) -paths "github.com/pkg/errors=errors" ./...
 	@$(FAILLINT) -paths "fmt.{Print,PrintfPrintln,Sprint}" -ignore-tests ./...
 	@echo ">> examining all of the Go files"
 	@go vet -stdmethods=false ./...

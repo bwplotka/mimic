@@ -5,16 +5,16 @@ package encoding
 
 import (
 	"bytes"
-
+	"errors"
+	"fmt"
 	"io"
 
 	ghodssyaml "github.com/ghodss/yaml"
-	"github.com/pkg/errors"
-	yaml2 "gopkg.in/yaml.v2"
+	yaml3 "gopkg.in/yaml.v3"
 )
 
 // GhodssYAML returns reader that encodes anything to YAML using github.com/ghodss/yaml.
-// Desired for e.g:
+// Recommended for e.g:
 // * Kubernetes
 func GhodssYAML(in ...interface{}) io.Reader {
 	return yaml(ghodssyaml.Marshal, in...)
@@ -24,7 +24,7 @@ func GhodssYAML(in ...interface{}) io.Reader {
 // Desired for e.g:
 // * Prometheus, Alertmanager configuration
 func YAML(in ...interface{}) io.Reader {
-	return yaml(yaml2.Marshal, in...)
+	return yaml(yaml3.Marshal, in...)
 }
 
 type MarshalFunc func(o interface{}) ([]byte, error)
@@ -45,7 +45,7 @@ func yaml(marshalFn MarshalFunc, in ...interface{}) io.Reader {
 		} else {
 			b, err := marshalFn(entry)
 			if err != nil {
-				return errReader{err: errors.Wrapf(err, "unable to marshal to YAML: %v", in)}
+				return errReader{err: fmt.Errorf("unable to marshal to YAML: %v: %w", in, err)}
 			}
 			entryBytes = b
 		}

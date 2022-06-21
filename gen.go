@@ -4,12 +4,12 @@
 package mimic
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -44,7 +44,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 
 	cmd, err := app.Parse(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, errors.Wrapf(err, "Error parsing commandline arguments"))
+		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("Error parsing commandline arguments: %v", err))
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
@@ -121,7 +121,7 @@ func (g *Generator) With(parts ...string) *Generator {
 // Generate generates the configuration files that have been defined and added to a generator.
 func (g *Generator) Generate() {
 	if g.generated {
-		PanicErr(errors.New("generate method already invoked once."))
+		PanicErr(errors.New("generate method already invoked once"))
 	}
 	defer func() { g.generated = true }()
 

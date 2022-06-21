@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/efficientgo/tools/core/pkg/testutil"
 )
 
 func TestYaml_EncodingToStructs(t *testing.T) {
@@ -31,8 +31,8 @@ func TestYaml_EncodingToStructs(t *testing.T) {
 			Field2: 2,
 		},
 	))
-	require.NoError(t, err)
-	require.Equal(t, `Field1: "1"
+	testutil.Ok(t, err)
+	testutil.Equals(t, `Field1: "1"
 Field2: 1
 Inner:
   Field1: inner1
@@ -62,8 +62,8 @@ func TestHCL_EncodingToStructs(t *testing.T) {
 		},
 		},
 	))
-	require.NoError(t, err)
-	require.Equal(t, `inner "test" {
+	testutil.Ok(t, err)
+	testutil.Equals(t, `inner "test" {
   field1 = "first"
   field2 = 12
 }
