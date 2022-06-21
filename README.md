@@ -11,7 +11,7 @@
 
 ...using simple, typed and testable Go code!
 
-_`mimic`: https://marvel.fandom.com/wiki/Power_Mimicry[Mimic is a super-human with the ability to copy the powers and abilities of others]._
+_`mimic`: [Mimic is a super-human with the ability to copy the powers and abilities of others](https://marvel.fandom.com/wiki/Power_Mimicry)._
 
 ## Getting Started
 
