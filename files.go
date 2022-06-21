@@ -4,15 +4,14 @@
 package mimic
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-
-	"github.com/pkg/errors"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 // FilePool is a struct for storing and managing files to be generated as part of generation.
@@ -52,14 +51,14 @@ func (f *FilePool) write(outputDir string) {
 	for file, contents := range f.m {
 		out := filepath.Join(outputDir, file)
 		if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
-			PanicErr(errors.Wrapf(err, "create directory %s", filepath.Dir(out)))
+			PanicErr(fmt.Errorf("create directory %s: %w", filepath.Dir(out), err))
 		}
 
 		// TODO(https://github.com/bwplotka/mimic/issues/11): Diff the things if something is already here and remove.
 
 		_ = level.Debug(f.Logger).Log("msg", "writing file", "file", out)
 		if err := ioutil.WriteFile(out, []byte(contents), 0755); err != nil {
-			PanicErr(errors.Wrapf(err, "write file to %s", out))
+			PanicErr(fmt.Errorf("write file to %s: %w", out, err))
 		}
 	}
 }

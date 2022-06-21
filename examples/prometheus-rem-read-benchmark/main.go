@@ -10,7 +10,8 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/bwplotka/mimic/lib/abstr/kubernetes/volumes"
+	"github.com/bwplotka/mimic/examples/prometheus-rem-read-benchmark/abstr/kubernetes/volumes"
+	"github.com/bwplotka/mimic/examples/prometheus-rem-read-benchmark/schemas/prometheus"
 	"github.com/go-openapi/swag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/bwplotka/mimic"
 	"github.com/bwplotka/mimic/encoding"
-	"github.com/bwplotka/mimic/lib/schemas/prometheus"
 )
 
 const (
@@ -110,7 +110,7 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 			},
 		},
 	}))
-	mimic.PanicIfErr(err)
+	mimic.PanicOnErr(err)
 
 	promConfigAndMount := volumes.ConfigAndMount{
 		ObjectMeta: metav1.ObjectMeta{

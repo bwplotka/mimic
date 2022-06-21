@@ -15,8 +15,8 @@ func PanicErr(err error) {
 	Panicf("failed to execute; err: %v", err)
 }
 
-// PanicIfErr allows to panic on error.
-func PanicIfErr(err error) {
+// PanicOnErr allows to panic on error.
+func PanicOnErr(err error) {
 	if err == nil {
 		return
 	}

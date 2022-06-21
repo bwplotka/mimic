@@ -6,16 +6,15 @@ package encoding
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 )
 
 // JSON returns reader that encodes anything to JSON.
 func JSON(in interface{}) io.Reader {
 	b, err := json.MarshalIndent(in, "", "  ")
 	if err != nil {
-		return errReader{err: errors.Wrapf(err, "unable to marshal to JSON: %v", in)}
+		return errReader{err: fmt.Errorf("unable to marshal to JSON: %v: %w", in, err)}
 	}
 	return bytes.NewBuffer(b)
 }

@@ -53,7 +53,7 @@ test:
 	@echo ">> testing binaries"
 	@go test ./...
 	@cd examples/kubernetes-statefulset && go run example.go generate
-	@cd examples/prometheus-remote-read-benchmark && go run main.go generate
+	@cd examples/prometheus-rem-read-benchmark && go run main.go generate
 	@cd examples/terraform && go run main.go generate
 
 
