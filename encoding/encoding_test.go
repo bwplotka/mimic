@@ -4,45 +4,120 @@
 package encoding
 
 import (
+	"io"
 	"io/ioutil"
 	"testing"
 
 	"github.com/efficientgo/tools/core/pkg/testutil"
 )
 
-func TestYaml_EncodingToStructs(t *testing.T) {
-	type A struct {
-		Field1 string
-		Field2 int
-		Inner  *A
-	}
+type A struct {
+	Field1     string `yaml:"FieldYolo1"`
+	Field2     int    `yaml:",omitempty"`
+	Inner      *A
+	InnerSlice []A `yaml:",omitempty"`
+}
 
-	actual, err := ioutil.ReadAll(GhodssYAML(
-		A{
-			Field1: "1",
-			Field2: 1,
-			Inner: &A{
-				Field1: "inner1",
-				Field2: 11,
-			},
+var testA = []interface{}{
+	A{
+		Field1: "1",
+		Field2: 1,
+		Inner: &A{
+			Field1: "inner1",
+			Field2: 11,
 		},
-		A{
-			Field1: "2",
-			Field2: 2,
+	},
+	A{
+		Field1: "2",
+		Field2: 2,
+		InnerSlice: []A{
+			{Field2: 3},
+			{Field2: 3},
 		},
-	))
-	testutil.Ok(t, err)
-	testutil.Equals(t, `Field1: "1"
+	},
+}
+
+func TestYaml_EncodingToStructs(t *testing.T) {
+	for _, tcase := range []struct {
+		encoder  io.Reader
+		expected string
+	}{
+		{
+			encoder: GhodssYAML(testA...),
+			expected: `Field1: "1"
 Field2: 1
 Inner:
   Field1: inner1
   Field2: 11
   Inner: null
+  InnerSlice: null
+InnerSlice: null
 ---
 Field1: "2"
 Field2: 2
 Inner: null
-`, string(actual))
+InnerSlice:
+- Field1: ""
+  Field2: 3
+  Inner: null
+  InnerSlice: null
+- Field1: ""
+  Field2: 3
+  Inner: null
+  InnerSlice: null
+`,
+		},
+		{
+			encoder: YAML(testA...),
+			expected: `FieldYolo1: "1"
+field2: 1
+inner:
+    FieldYolo1: inner1
+    field2: 11
+    inner: null
+---
+FieldYolo1: "2"
+field2: 2
+inner: null
+innerslice:
+    - FieldYolo1: ""
+      field2: 3
+      inner: null
+    - FieldYolo1: ""
+      field2: 3
+      inner: null
+`,
+		},
+		{
+			encoder: YAML(testA...),
+			expected: `FieldYolo1: "1"
+field2: 1
+inner:
+    FieldYolo1: inner1
+    field2: 11
+    inner: null
+---
+FieldYolo1: "2"
+field2: 2
+inner: null
+innerslice:
+    - FieldYolo1: ""
+      field2: 3
+      inner: null
+    - FieldYolo1: ""
+      field2: 3
+      inner: null
+`,
+		},
+	} {
+		if ok := t.Run("", func(t *testing.T) {
+			actual, err := ioutil.ReadAll(tcase.encoder)
+			testutil.Ok(t, err)
+			testutil.Equals(t, tcase.expected, string(actual))
+		}); !ok {
+			return
+		}
+	}
 }
 
 func TestHCL_EncodingToStructs(t *testing.T) {
