@@ -61,5 +61,5 @@ func main() {
 		},
 	}
 	// Now Add some-statefulset.yaml to the config folder.
-	generator.With("config").Add(name+".yaml", encoding.GhodssYAML(set))
+	generator.With("config").WithGeneratedHeader().Add(name+".yaml", encoding.GhodssYAML(set))
 }

@@ -44,7 +44,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 
 	cmd, err := app.Parse(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("Error parsing commandline arguments: %v", err))
+		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("error parsing commandline arguments: %v", err))
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
@@ -86,24 +86,28 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 // Example:
 //
 // ```
-//  gen := gen.With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+//
+//	gen := gen.With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+//
 // ```
 // Giving the path `mycompany.com/production/eu1/kubernetes/thanos`.
 //
 // With return a Generator pointing at the specified path which can be specified even further:
 // Example:
 // ```
-//   gen := mimic.New()
-//   // gen/
-//   ...
-//   gen = gen.With('foo')
-//   // gen/foo
-//   ...
-//   {
-//     gen := gen.With('bar')
-//     // gen/foo/bar
-//   }
-//   // gen/foo
+//
+//	gen := mimic.New()
+//	// gen/
+//	...
+//	gen = gen.With('foo')
+//	// gen/foo
+//	...
+//	{
+//	  gen := gen.With('bar')
+//	  // gen/foo/bar
+//	}
+//	// gen/foo
+//
 // ```
 func (g *Generator) With(parts ...string) *Generator {
 	// TODO(bwplotka): Support "..", to get back?
@@ -114,6 +118,18 @@ func (g *Generator) With(parts ...string) *Generator {
 			Logger: g.Logger,
 			path:   append(g.path, parts...),
 			m:      g.m,
+		},
+	}
+}
+
+func (g *Generator) WithGeneratedHeader() *Generator {
+	return &Generator{
+		out: g.out,
+		FilePool: FilePool{
+			Logger:          g.Logger,
+			path:            g.path,
+			m:               g.m,
+			generatedHeader: true,
 		},
 	}
 }
