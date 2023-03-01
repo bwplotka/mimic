@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	generator := mimic.New()
+	generator := mimic.New().WithTopLevelComment(mimic.GeneratedComment)
 
 	// Defer Generate to ensure we generate the output.
 	defer generator.Generate()
@@ -61,5 +61,5 @@ func main() {
 		},
 	}
 	// Now Add some-statefulset.yaml to the config folder.
-	generator.With("config").WithGeneratedHeader().Add(name+".yaml", encoding.GhodssYAML(set))
+	generator.With("config").WithTopLevelComment("Represents a K8s StatefulSet with two containers.").Add(name+".yaml", encoding.GhodssYAML(set))
 }
