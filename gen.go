@@ -133,7 +133,25 @@ func (g *Generator) With(parts ...string) *Generator {
 //
 //	gen.With("config").WithTopLevelComment(mimic.GeneratedComment).Add(name+".yaml", encoding.GhodssYAML(config))
 //
-// NOTE: This option is not compatible with encoding.JSON, as JSON is a does not support comments.
+// Like With, you can also chain multiple WithTopLevelComment(), which will be added to the top of a file in that order.
+//
+// Example:
+//
+//	gen := mimic.New()
+//
+//	defer gen.Generate()
+//	gen = gen.WithTopLevelComment("Foo.")
+//
+//	gen.With("config").WithTopLevelComment("Bar.").Add(name+".yaml", encoding.GhodssYAML(config))
+//
+// This will result in a YAML file like,
+//
+//	# Foo.
+//	# Bar.
+//	config:
+//	- prometheus:
+//
+// NOTE: This option is not compatible with encoding.JSON and will be treated as a no-op, as it does not support comments.
 func (g *Generator) WithTopLevelComment(content ...string) *Generator {
 	return &Generator{
 		out: g.out,

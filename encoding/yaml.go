@@ -19,7 +19,7 @@ type yamlEncoder struct {
 	io.Reader
 }
 
-// Function to add comment strings at the top of a YAML file.
+// Commenter adds comment strings at the top of a YAML file.
 // Each string in comments slice is treated as a new comment.
 func (yamlEncoder) Commenter(b []byte, comments []string) []byte {
 	finalString := ""
@@ -34,8 +34,12 @@ func (yamlEncoder) Commenter(b []byte, comments []string) []byte {
 			finalString = finalString + "\n" + "# " + comment
 		}
 	}
-	finalString = finalString + "\n"
 
+	if finalString == "" {
+		return b
+	}
+
+	finalString = finalString + "\n"
 	b = append([]byte(finalString), b...)
 	return b
 }
