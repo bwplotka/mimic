@@ -5,7 +5,6 @@ package encoding
 
 import (
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/efficientgo/tools/core/pkg/testutil"
@@ -111,7 +110,7 @@ innerslice:
 		},
 	} {
 		if ok := t.Run("", func(t *testing.T) {
-			actual, err := ioutil.ReadAll(tcase.encoder)
+			actual, err := io.ReadAll(tcase.encoder)
 			testutil.Ok(t, err)
 			testutil.Equals(t, tcase.expected, string(actual))
 		}); !ok {
@@ -127,7 +126,7 @@ func TestHCL_EncodingToStructs(t *testing.T) {
 		Field2 int    `hcl:"field2"`
 	}
 
-	actual, err := ioutil.ReadAll(HCL(
+	actual, err := io.ReadAll(HCL(
 		struct {
 			Inner `hcl:"inner"`
 		}{Inner{

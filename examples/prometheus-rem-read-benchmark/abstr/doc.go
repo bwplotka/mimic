@@ -10,7 +10,8 @@ Abstraction packages should follow a folder structure that allows clear understa
 abstractions
   - prometheus   // Abstraction for generation of Prometheus configuration for Prometheus to consume.
   - kubernetes
-    - prometheus // Kubernetes abstractions for the deployment of Prometheus.
+  - prometheus // Kubernetes abstractions for the deployment of Prometheus.
+
 ```
 */
 package abstr
