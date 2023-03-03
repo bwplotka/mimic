@@ -11,10 +11,21 @@ import (
 	"github.com/rodaine/hclencoder"
 )
 
-func HCL(in interface{}) io.Reader {
+// hclEncoder implements the Encoder interface.
+type hclEncoder struct {
+	io.Reader
+}
+
+// EncodeComment returns byte slice that represents a HCL comment (same as YAML).
+// We split `lines` by '\n' and encode as a single/multi line comment.
+func (hclEncoder) EncodeComment(lines string) []byte {
+	return YAML().EncodeComment(lines)
+}
+
+func HCL(in interface{}) hclEncoder {
 	b, err := hclencoder.Encode(in)
 	if err != nil {
-		return errReader{err: fmt.Errorf("unable to marshal to HCL: %v: %w", in, err)}
+		return hclEncoder{Reader: errReader{err: fmt.Errorf("unable to marshal to HCL: %v: %w", in, err)}}
 	}
-	return bytes.NewBuffer(b)
+	return hclEncoder{Reader: bytes.NewBuffer(b)}
 }

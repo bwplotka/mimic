@@ -44,7 +44,7 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 
 	cmd, err := app.Parse(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("Error parsing commandline arguments: %v", err))
+		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("error parsing commandline arguments: %v", err))
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
@@ -86,24 +86,28 @@ func New(injs ...func(cmd *kingpin.CmdClause)) *Generator {
 // Example:
 //
 // ```
-//  gen := gen.With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+//
+//	gen := gen.With("mycompany.com", "production", "eu1", "kubernetes", "thanos")
+//
 // ```
 // Giving the path `mycompany.com/production/eu1/kubernetes/thanos`.
 //
 // With return a Generator pointing at the specified path which can be specified even further:
 // Example:
 // ```
-//   gen := mimic.New()
-//   // gen/
-//   ...
-//   gen = gen.With('foo')
-//   // gen/foo
-//   ...
-//   {
-//     gen := gen.With('bar')
-//     // gen/foo/bar
-//   }
-//   // gen/foo
+//
+//	gen := mimic.New()
+//	// gen/
+//	...
+//	gen = gen.With('foo')
+//	// gen/foo
+//	...
+//	{
+//	  gen := gen.With('bar')
+//	  // gen/foo/bar
+//	}
+//	// gen/foo
+//
 // ```
 func (g *Generator) With(parts ...string) *Generator {
 	// TODO(bwplotka): Support "..", to get back?
@@ -111,9 +115,51 @@ func (g *Generator) With(parts ...string) *Generator {
 	return &Generator{
 		out: g.out,
 		FilePool: FilePool{
-			Logger: g.Logger,
-			path:   append(g.path, parts...),
-			m:      g.m,
+			Logger:           g.Logger,
+			path:             append(g.path, parts...),
+			m:                g.m,
+			topLevelComments: g.topLevelComments,
+		},
+	}
+}
+
+// WithTopLevelComment enables mimic to add any string as a header comment for a genenrated
+// file. Follows same usage semantics as With().
+//
+// Example:
+//
+//	gen := mimic.New()
+//	defer gen.Generate()
+//
+//	gen.With("config").WithTopLevelComment(mimic.GeneratedComment).Add(name+".yaml", encoding.GhodssYAML(config))
+//
+// Like With, you can also chain multiple WithTopLevelComment(), which will be added to the top of a file in that order.
+//
+// Example:
+//
+//	gen := mimic.New()
+//
+//	defer gen.Generate()
+//	gen = gen.WithTopLevelComment("Foo.")
+//
+//	gen.With("config").WithTopLevelComment("Bar.").Add(name+".yaml", encoding.GhodssYAML(config))
+//
+// This will result in a YAML file like,
+//
+//	# Foo.
+//	# Bar.
+//	config:
+//	- prometheus:
+//
+// NOTE: This option will be noop for encodings that does not support comment (e.g. encoding.JSON).
+func (g *Generator) WithTopLevelComment(content string) *Generator {
+	return &Generator{
+		out: g.out,
+		FilePool: FilePool{
+			Logger:           g.Logger,
+			path:             g.path,
+			m:                g.m,
+			topLevelComments: append(g.topLevelComments, content),
 		},
 	}
 }

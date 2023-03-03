@@ -23,7 +23,8 @@ Use the folder structure to help highlight what config the code will produce:
 providers
   - vault       // Configuration passed to the vault product itself.
   - terraform
-    - vault     // Terraform provider/resource configuration used by terraform.
+  - vault     // Terraform provider/resource configuration used by terraform.
+
 ```
 */
 package schemas

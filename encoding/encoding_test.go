@@ -5,7 +5,6 @@ package encoding
 
 import (
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/efficientgo/tools/core/pkg/testutil"
@@ -111,7 +110,7 @@ innerslice:
 		},
 	} {
 		if ok := t.Run("", func(t *testing.T) {
-			actual, err := ioutil.ReadAll(tcase.encoder)
+			actual, err := io.ReadAll(tcase.encoder)
 			testutil.Ok(t, err)
 			testutil.Equals(t, tcase.expected, string(actual))
 		}); !ok {
@@ -127,7 +126,7 @@ func TestHCL_EncodingToStructs(t *testing.T) {
 		Field2 int    `hcl:"field2"`
 	}
 
-	actual, err := ioutil.ReadAll(HCL(
+	actual, err := io.ReadAll(HCL(
 		struct {
 			Inner `hcl:"inner"`
 		}{Inner{
@@ -143,4 +142,69 @@ func TestHCL_EncodingToStructs(t *testing.T) {
   field2 = 12
 }
 `, string(actual))
+}
+
+func TestEncodingComments(t *testing.T) {
+	for _, tcase := range []struct {
+		name     string
+		encoder  Encoder
+		comment  string
+		expected string
+	}{
+		{
+			name:     "single line ghodss",
+			encoder:  GhodssYAML(),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line ghodss",
+			encoder:  GhodssYAML(),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+		{
+			name:     "single line yaml2",
+			encoder:  YAML2(),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line yaml2",
+			encoder:  YAML2(),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+		{
+			name:     "single line hcl",
+			encoder:  HCL(testA),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line hcl",
+			encoder:  HCL(testA),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+		{
+			name:     "single line json",
+			encoder:  JSON(testA),
+			comment:  "This is a single line comment.",
+			expected: "",
+		},
+		{
+			name:     "multi line json",
+			encoder:  JSON(testA),
+			comment:  "This is a multi\n line comment.",
+			expected: "",
+		},
+	} {
+		if ok := t.Run(tcase.name, func(t *testing.T) {
+			actual := tcase.encoder.EncodeComment(tcase.comment)
+			testutil.Equals(t, tcase.expected, string(actual))
+		}); !ok {
+			return
+		}
+	}
 }

@@ -5,7 +5,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"path"
 
 	"github.com/prometheus/common/model"
@@ -103,7 +103,7 @@ func genRRTestPrometheus(generator *mimic.Generator, name string, promVersion st
 	)
 
 	// Empty configuration, we don't need any scrape.
-	cfgBytes, err := ioutil.ReadAll(encoding.YAML(prometheus.Config{
+	cfgBytes, err := io.ReadAll(encoding.YAML(prometheus.Config{
 		GlobalConfig: prometheus.GlobalConfig{
 			ExternalLabels: map[model.LabelName]model.LabelValue{
 				"replica": "0",
