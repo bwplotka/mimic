@@ -187,6 +187,18 @@ func TestEncodingComments(t *testing.T) {
 			comment:  "This is a multi\n line comment.",
 			expected: "# This is a multi\n# line comment.\n",
 		},
+		{
+			name:     "single line json",
+			encoder:  JSON(testA),
+			comment:  "This is a single line comment.",
+			expected: "",
+		},
+		{
+			name:     "multi line json",
+			encoder:  JSON(testA),
+			comment:  "This is a multi\n line comment.",
+			expected: "",
+		},
 	} {
 		if ok := t.Run(tcase.name, func(t *testing.T) {
 			actual := tcase.encoder.EncodeComment(tcase.comment)

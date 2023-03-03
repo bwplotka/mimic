@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/rodaine/hclencoder"
 )
@@ -17,30 +16,10 @@ type hclEncoder struct {
 	io.Reader
 }
 
-// EncodeComment returns byte slice that represents a HCL comment.
-// We split `lines` by U+000A and encode as a single/multi line comment.
+// EncodeComment returns byte slice that represents a HCL comment (same as YAML).
+// We split `lines` by '\n' and encode as a single/multi line comment.
 func (hclEncoder) EncodeComment(lines string) []byte {
-	commentLines := strings.Split(lines, "\n")
-
-	finalString := ""
-	for _, comment := range commentLines {
-		if comment == "" {
-			continue
-		}
-
-		if finalString == "" {
-			finalString = "# " + strings.TrimLeft(comment, " ")
-		} else {
-			finalString = finalString + "\n" + "# " + strings.TrimLeft(comment, " ")
-		}
-	}
-
-	if finalString == "" {
-		return []byte{}
-	}
-
-	finalString = finalString + "\n"
-	return []byte(finalString)
+	return YAML().EncodeComment(lines)
 }
 
 func HCL(in interface{}) hclEncoder {

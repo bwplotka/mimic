@@ -21,7 +21,7 @@ type yamlEncoder struct {
 }
 
 // EncodeComment returns byte slice that represents a YAML comment.
-// We split `lines` by U+000A and encode as a single/multi line comment.
+// We split `lines` by '\n' and encode as a single/multi line comment.
 func (yamlEncoder) EncodeComment(lines string) []byte {
 	commentLines := strings.Split(lines, "\n")
 

@@ -10,6 +10,6 @@ type Encoder interface {
 	io.Reader
 
 	// EncodeComment returns a slice of bytes that represents `lines` as a comment string
-	// in a particular config language. `lines` can be a single or multiple line comment
+	// in a particular config language. `lines` can be a single or multiple line comment, separated by '\n'
 	EncodeComment(lines string) []byte
 }
