@@ -151,7 +151,7 @@ func (g *Generator) With(parts ...string) *Generator {
 //	config:
 //	- prometheus:
 //
-// NOTE: This option is not compatible with encoding.JSON and will be treated as a no-op, as it does not support comments.
+// NOTE: This option will be noop for encodings that does not support comment (e.g. encoding.JSON).
 func (g *Generator) WithTopLevelComment(content ...string) *Generator {
 	return &Generator{
 		out: g.out,
