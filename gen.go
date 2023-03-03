@@ -152,14 +152,14 @@ func (g *Generator) With(parts ...string) *Generator {
 //	- prometheus:
 //
 // NOTE: This option will be noop for encodings that does not support comment (e.g. encoding.JSON).
-func (g *Generator) WithTopLevelComment(content ...string) *Generator {
+func (g *Generator) WithTopLevelComment(content string) *Generator {
 	return &Generator{
 		out: g.out,
 		FilePool: FilePool{
 			Logger:           g.Logger,
 			path:             g.path,
 			m:                g.m,
-			topLevelComments: append(g.topLevelComments, content...),
+			topLevelComments: append(g.topLevelComments, content),
 		},
 	}
 }
