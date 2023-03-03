@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/rodaine/hclencoder"
 )
@@ -16,29 +17,30 @@ type hclEncoder struct {
 	io.Reader
 }
 
-// Commenter adds comment strings at the top of a HCL file.
-// Each string in comments slice is treated as a new comment.
-func (hclEncoder) Commenter(b []byte, comments []string) []byte {
+// EncodeComment returns byte slice that represents a HCL comment.
+// We split `lines` by U+000A and encode as a single/multi line comment.
+func (hclEncoder) EncodeComment(lines string) []byte {
+	commentLines := strings.Split(lines, "\n")
+
 	finalString := ""
-	for _, comment := range comments {
+	for _, comment := range commentLines {
 		if comment == "" {
 			continue
 		}
 
 		if finalString == "" {
-			finalString = "# " + comment
+			finalString = "# " + strings.TrimLeft(comment, " ")
 		} else {
-			finalString = finalString + "\n" + "# " + comment
+			finalString = finalString + "\n" + "# " + strings.TrimLeft(comment, " ")
 		}
 	}
 
 	if finalString == "" {
-		return b
+		return []byte{}
 	}
 
 	finalString = finalString + "\n"
-	b = append([]byte(finalString), b...)
-	return b
+	return []byte(finalString)
 }
 
 func HCL(in interface{}) hclEncoder {

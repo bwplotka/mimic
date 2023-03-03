@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	ghodssyaml "github.com/ghodss/yaml"
 	yaml2 "gopkg.in/yaml.v3"
@@ -19,29 +20,30 @@ type yamlEncoder struct {
 	io.Reader
 }
 
-// Commenter adds comment strings at the top of a YAML file.
-// Each string in comments slice is treated as a new comment.
-func (yamlEncoder) Commenter(b []byte, comments []string) []byte {
+// EncodeComment returns byte slice that represents a YAML comment.
+// We split `lines` by U+000A and encode as a single/multi line comment.
+func (yamlEncoder) EncodeComment(lines string) []byte {
+	commentLines := strings.Split(lines, "\n")
+
 	finalString := ""
-	for _, comment := range comments {
+	for _, comment := range commentLines {
 		if comment == "" {
 			continue
 		}
 
 		if finalString == "" {
-			finalString = "# " + comment
+			finalString = "# " + strings.TrimLeft(comment, " ")
 		} else {
-			finalString = finalString + "\n" + "# " + comment
+			finalString = finalString + "\n" + "# " + strings.TrimLeft(comment, " ")
 		}
 	}
 
 	if finalString == "" {
-		return b
+		return []byte{}
 	}
 
 	finalString = finalString + "\n"
-	b = append([]byte(finalString), b...)
-	return b
+	return []byte(finalString)
 }
 
 // GhodssYAML returns reader that encodes anything to YAML using github.com/ghodss/yaml.

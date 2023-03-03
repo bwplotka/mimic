@@ -143,3 +143,56 @@ func TestHCL_EncodingToStructs(t *testing.T) {
 }
 `, string(actual))
 }
+
+func TestEncodingComments(t *testing.T) {
+	for _, tcase := range []struct {
+		name     string
+		encoder  Encoder
+		comment  string
+		expected string
+	}{
+		{
+			name:     "single line ghodss",
+			encoder:  GhodssYAML(),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line ghodss",
+			encoder:  GhodssYAML(),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+		{
+			name:     "single line yaml2",
+			encoder:  YAML2(),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line yaml2",
+			encoder:  YAML2(),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+		{
+			name:     "single line hcl",
+			encoder:  HCL(testA),
+			comment:  "This is a single line comment.",
+			expected: "# This is a single line comment.\n",
+		},
+		{
+			name:     "multi line hcl",
+			encoder:  HCL(testA),
+			comment:  "This is a multi\n line comment.",
+			expected: "# This is a multi\n# line comment.\n",
+		},
+	} {
+		if ok := t.Run(tcase.name, func(t *testing.T) {
+			actual := tcase.encoder.EncodeComment(tcase.comment)
+			testutil.Equals(t, tcase.expected, string(actual))
+		}); !ok {
+			return
+		}
+	}
+}

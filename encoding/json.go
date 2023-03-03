@@ -15,9 +15,9 @@ type jsonEncoder struct {
 	io.Reader
 }
 
-// Commenter is a no-op for JSON.
-func (jsonEncoder) Commenter(b []byte, comments []string) []byte {
-	return b
+// EncodeComment is a no-op for JSON encoder, as JSON doesn't support comments.
+func (jsonEncoder) EncodeComment(lines string) []byte {
+	return []byte{}
 }
 
 // JSON returns reader that encodes anything to JSON.

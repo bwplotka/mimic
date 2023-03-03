@@ -61,5 +61,5 @@ func main() {
 		},
 	}
 	// Now Add some-statefulset.yaml to the config folder.
-	generator.With("config").WithTopLevelComment("Represents a K8s StatefulSet with two containers.").Add(name+".yaml", encoding.GhodssYAML(set))
+	generator.With("config").WithTopLevelComment("Represents a K8s StatefulSet \nwith two containers.").Add(name+".yaml", encoding.GhodssYAML(set))
 }

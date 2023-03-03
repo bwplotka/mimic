@@ -42,7 +42,13 @@ func (f *FilePool) Add(fileName string, e encoding.Encoder) {
 		Panicf("failed to output: %s", err)
 	}
 
-	b = e.Commenter(b, f.topLevelComments)
+	if len(f.topLevelComments) > 0 {
+		commentBytes := []byte{}
+		for _, comment := range f.topLevelComments {
+			commentBytes = append(commentBytes, e.EncodeComment(comment)...)
+		}
+		b = append(commentBytes, b...)
+	}
 
 	output := filepath.Join(append(f.path, fileName)...)
 

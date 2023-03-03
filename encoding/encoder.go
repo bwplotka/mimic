@@ -8,5 +8,8 @@ import "io"
 // Encoder implements the needed functions to encode a Go struct to a particular config language.
 type Encoder interface {
 	io.Reader
-	Commenter(b []byte, comments []string) []byte
+
+	// EncodeComment returns a slice of bytes that represents `lines` as a comment string
+	// in a particular config language. `lines` can be a single or multiple line comment
+	EncodeComment(lines string) []byte
 }
