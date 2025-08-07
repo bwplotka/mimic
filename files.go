@@ -52,10 +52,15 @@ func (f *FilePool) Add(fileName string, e encoding.Encoder) {
 
 	output := filepath.Join(append(f.path, fileName)...)
 
+	if f.m == nil {
+		f.m = make(map[string]string)
+	}
+
 	// Check whether we have already written something into this file.
 	if _, ok := f.m[output]; ok {
 		Panicf("filename clash: %s", output)
 	}
+
 	f.m[output] = string(b)
 }
 
